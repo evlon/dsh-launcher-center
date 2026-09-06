@@ -1,0 +1,8 @@
+# 运行时数据（客户端记录、策略配置——含敏感信息，绝不提交）
+data/
+
+# Node
+node_modules
+
+# Logs / runtime
+*.log

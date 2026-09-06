@@ -1,7 +1,7 @@
-# Harness Launcher × Caddy 集成测试
+# Harness 中心管理 × Caddy 集成测试
 
-本目录（`../caddy/`）模拟企业内网部署：
-Caddy 作为反向代理网关，把 `ai-conf.ict.cmcc` 转发到本机 launcher 中心服务端。
+本仓库可与 Caddy 配合模拟企业内网部署（本机 `E:\ai-works\caddy\`）：
+Caddy 作为反向代理网关，把 `ai-conf.ict.cmcc` 转发到本机中心服务端。
 
 ## 部署拓扑
 
@@ -10,9 +10,9 @@ Caddy 作为反向代理网关，把 `ai-conf.ict.cmcc` 转发到本机 launcher
 ```
 
 - hosts 已配置：`127.0.0.1 ai-roster.ict.cmcc ai-conf.ict.cmcc`
-- Caddyfile：`ai-conf.ict.cmcc` → `127.0.0.1:8081`（launcher 服务端），
+- Caddyfile：`ai-conf.ict.cmcc` → `127.0.0.1:8081`（中心服务端），
   `ai-roster.ict.cmcc` → `127.0.0.1:8765`（另一个服务，本测试不用）
-- launcher 服务端数据目录：`launcher-data/`（config.json + clients/）
+- 中心服务端数据目录：`launcher-data/`（config.json + clients/，由 `--data` 指向）
 
 ## 一键集成测试
 
@@ -22,7 +22,7 @@ Caddy 作为反向代理网关，把 `ai-conf.ict.cmcc` 转发到本机 launcher
 # 1. 启动 launcher 中心服务端（独立进程，数据指向 caddy/launcher-data）
 $node = (Get-Command node).Source
 Start-Process $node -ArgumentList @(
-  "E:\ai-works\deepseek-harness-launcher\server\server.js",
+  "E:\ai-works\dsh-launcher-center\server.js",
   "--port", "8081",
   "--data", "E:\ai-works\caddy\launcher-data",
   "--token", "test123"

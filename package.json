@@ -1,8 +1,8 @@
 {
-  "name": "dsh-launcher-center-server",
+  "name": "dsh-launcher-center",
   "version": "0.2.1",
   "private": true,
-  "description": "DeepSeek Harness Launcher 企业中心服务端：推荐插件配置分发 + 客户端同步状态收集（零依赖）。",
+  "description": "Harness 中心管理（dsh-launcher-center）：企业中心服务端——推荐插件配置分发 + 客户端同步状态收集 + 管理控制台（零依赖，纯 Node）。",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
