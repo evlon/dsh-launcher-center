@@ -241,17 +241,23 @@ function authorized(req) {
 
 const META_CACHE = new Map(); // name -> { meta, fetchedAt }
 const META_CACHE_TTL_MS = 10 * 60 * 1000; // 10 分钟缓存
-const REGISTRIES = [
-  { url: "https://registry.npmjs.org", label: "npmjs" },
-  { url: "https://registry.npmmirror.com", label: "npmmirror" },
-  // 内网 registry（如企业私服）：命中即优先，放在最后作兜底
-];
+// 网络边界设计（见 README「网络边界与角色」）：中心服务端默认**不出外网**——
+// 只查 REGISTRY_OVERRIDE 注入的内网 registry；npmjs/npmmirror 外网源仅在显式
+// ALLOW_UPSTREAM=1（能出网的部署）时才追加作兜底。上游元信息的常规查询由管理页
+// 经管理员本机 launcher bridge 中转，服务端内网隔离时不应直连外网。
+const REGISTRIES = [];
 // 允许通过环境变量注入内网 registry（server 启动时 REGISTRY_OVERRIDE=http://registry.ict.cmcc）
 if (process.env.REGISTRY_OVERRIDE) {
-  REGISTRIES.unshift({ url: process.env.REGISTRY_OVERRIDE.replace(/\/+$/, ""), label: "内网" });
+  REGISTRIES.push({ url: process.env.REGISTRY_OVERRIDE.replace(/\/+$/, ""), label: "内网" });
+}
+if (process.env.ALLOW_UPSTREAM === "1") {
+  REGISTRIES.push(
+    { url: "https://registry.npmjs.org", label: "npmjs" },
+    { url: "https://registry.npmmirror.com", label: "npmmirror" }
+  );
 }
 
-/** 从 registry 拉取单个插件元信息（npmjs → npmmirror → 内网 依次尝试）。 */
+/** 从 registry 拉取单个插件元信息（仅内网源；ALLOW_UPSTREAM=1 时追加 npmjs→npmmirror 兜底）。 */
 async function fetchPluginMeta(name) {
   for (const reg of REGISTRIES) {
     try {
@@ -446,6 +452,17 @@ async function route(req, res) {
       if (cd.useSystemNode !== undefined) {
         if (typeof cd.useSystemNode !== "boolean") return send(res, 400, { error: "clientDefaults.useSystemNode 必须是布尔值" });
         cleaned.useSystemNode = cd.useSystemNode;
+      }
+      // dshRegistry：内网 dsh 安装源（同事 launcher 装/更新 dsh 时走内网 npm registry，
+      // 写入其 mirrorSettings.registry）。空串=清除（不覆盖，回退地域源）。
+      if (cd.dshRegistry !== undefined) {
+        if (cd.dshRegistry === "" || cd.dshRegistry === null) {
+          cleaned.dshRegistry = "";
+        } else if (typeof cd.dshRegistry !== "string" || !/^https?:\/\/\S+$/.test(cd.dshRegistry.trim())) {
+          return send(res, 400, { error: "clientDefaults.dshRegistry 必须是 http(s) 地址或空串" });
+        } else {
+          cleaned.dshRegistry = cd.dshRegistry.trim();
+        }
       }
       cfg.clientDefaults = cleaned;
     }
@@ -925,6 +942,9 @@ function adminPageHtml() {
       </div>
       <div style="margin-bottom:10px;font-size:13px">
         <label><input type="checkbox" id="cdUseSystemNode" style="width:auto"> 客户端优先使用系统 node（主版本≥22 则跳过下载自带 node）</label>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <input class="input" id="cdDshRegistry" placeholder="dsh 安装内网源（如 http://registry.ict.cmcc；同事装/更新 dsh 走内网 npm registry 加速，空=不下发）" style="flex:1">
       </div>
       <div style="margin-top:12px"><button class="btn primary" onclick="saveClientDefaults()">保存客户端默认配置</button></div>
     </div>

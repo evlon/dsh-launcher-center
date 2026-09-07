@@ -93,6 +93,7 @@ function renderClientDefaults(){
   document.getElementById("cdSyncSecs").value=cd.syncIntervalSecs||"";
   document.getElementById("cdProfile").value=cd.profile||"";
   document.getElementById("cdUseSystemNode").checked=!!cd.useSystemNode;
+  document.getElementById("cdDshRegistry").value=cd.dshRegistry||"";
   const ms=current.mirrorSettings||{};
   document.getElementById("mirrorRegistry").value=ms.registry||"http://registry.ict.cmcc";
   document.getElementById("mirrorToken").value=ms.tokenValue||"";
@@ -115,6 +116,9 @@ async function saveClientDefaults(){
     if(sync){ const s=parseInt(sync,10); if(s<30){ toast("同步间隔需 >=30","warn"); return; } cd.syncIntervalSecs=s; }
     if(prof) cd.profile=prof;
     cd.useSystemNode=document.getElementById("cdUseSystemNode").checked;
+    // dshRegistry：内网 dsh 安装源（下发给同事装/更新 dsh 用）；空=不下发（保留）
+    const dshReg=document.getElementById("cdDshRegistry").value.trim();
+    if(dshReg){ cd.dshRegistry=dshReg; }
     const body={plugins:current.plugins,managedMenu:current.managedMenu,clientDefaults:cd};
     const r=await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
     const j=await r.json();

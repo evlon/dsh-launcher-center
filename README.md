@@ -104,6 +104,25 @@ node server.js --port 8080 --token 你的管理口令
 
 这样服务端全程不出网，只靠管理员电脑中转。本地 API 仅绑 127.0.0.1，可选 token 防护。
 
+## 网络边界与角色（设计约束，勿违背）
+
+企业内网拓扑把各角色分成**三层出网能力**，代码改动必须遵守：
+
+| 角色 | 出外网？ | 访问范围 | 说明 |
+|---|---|---|---|
+| **registry.ict.cmcc**（npm 私服，如 Verdaccio） | 否（被服务） | 全部角色可达 | 所有 npm 包镜像目标 |
+| **中心服务端**（ai-conf.ict.cmcc → launcher-server 8081） | **否** | 仅内网 registry + 客户端 + 管理页 | 服务端**只允许查内网源**：`REGISTRY_OVERRIDE` 注入内网 registry 且**默认不内置外网源**；仅设 `ALLOW_UPSTREAM=1` 才追加 npmjs/npmmirror 兜底（兜底只用于能出网的部署）。上游包元信息查询由管理页经管理员 bridge 中转 |
+| **管理员本机 launcher** | **是（唯一出口）** | 外网 npmjs/npmmirror + 内网 registry | 外网代理网关：依赖树解析（npmmirror→npmjs）与 npm pack 走外网，publish 进内网；**刻意不查内网作解析源**（防内网→内网自环拉不到新版） |
+| **同事 PC launcher** | 否 | 仅 ai-conf + 内网 registry | 纯消费端 |
+
+**两个独立通道（勿混）**：
+- **dsh 本体安装源**：`mirrorSettings.registry`（launcher `dsh_npm::npm_registry_for_install`）——显式配置非空才走内网，否则按地域 npmmirror/npmjs。
+- **插件安装源**：`npmRegistry`（写 profile `.npmrc`）——服务端 `clientDefaults.npmRegistry` 下发。
+
+**下发约定**：服务端 `mirrorSettings.dshMirrorUrl` 会被 launcher 覆盖应用（企业统一管理项），
+但 `mirrorSettings.registry` 属**机器本地配置**（同事 launcher 的镜像目标，可由本地管理员
+配置/默认内置），服务端不下发覆盖——如需企业统一指向内网源，由客户端默认配置通道下发。
+
 ## 客户端上报（`data/clients/<clientId>.json`）
 
 每台客户端每次成功上报覆盖写入：
