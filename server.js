@@ -41,6 +41,9 @@ const CLIENTS_DIR = path.join(ARGS.data, "clients");
 // 「npm 包同步」清单（通用 npm 包镜像，非插件）——独立文件，不进 config.json
 // 下发给客户端的面（mirrorPackages 仅管理用途，避免 sync.rs/客户端解析未知字段）。
 const MIRROR_PACKAGES_PATH = path.join(ARGS.data, "mirror-packages.json");
+// launcher 托盘自身发布物（exe + 元数据）——供同事 launcher 内网自动更新
+const LAUNCHER_RELEASES_DIR = path.join(ARGS.data, "launcher-releases");
+const LAUNCHER_META_PATH = path.join(LAUNCHER_RELEASES_DIR, "latest.json");
 
 function ensureData() {
   fs.mkdirSync(ARGS.data, { recursive: true });
@@ -51,6 +54,35 @@ function ensureData() {
   if (!fs.existsSync(MIRROR_PACKAGES_PATH)) {
     writeMirrorPackages([]);
   }
+  fs.mkdirSync(LAUNCHER_RELEASES_DIR, { recursive: true });
+}
+
+// ---------- launcher 发布物（自动更新） ----------
+
+/** 读 launcher 最新发布元数据（无发布/损坏返回 null）。 */
+function readLauncherReleaseMeta() {
+  try {
+    return JSON.parse(fs.readFileSync(LAUNCHER_META_PATH, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+/** 写 launcher 发布元数据（latest.json）。 */
+function writeLauncherReleaseMeta(meta) {
+  fs.writeFileSync(LAUNCHER_META_PATH, JSON.stringify(meta, null, 2), "utf8");
+}
+
+/** 删除旧版本产物文件（保留当前 latest 指向的文件；可传 keepFile 排除）。 */
+function cleanupLauncherReleases(keepFile) {
+  try {
+    const entries = fs.readdirSync(LAUNCHER_RELEASES_DIR);
+    for (const f of entries) {
+      if (f === "latest.json") continue;
+      if (keepFile && f === keepFile) continue;
+      try { fs.unlinkSync(path.join(LAUNCHER_RELEASES_DIR, f)); } catch { /* 忽略删除失败 */ }
+    }
+  } catch { /* 目录不存在忽略 */ }
 }
 
 function defaultConfig() {
@@ -193,6 +225,25 @@ function readBody(req, limit = 1 << 20) {
         reject(new Error("invalid json: " + e.message));
       }
     });
+    req.on("error", reject);
+  });
+}
+
+/** 读取原始字节体（上传 launcher 安装包等二进制用，limit 单位字节）。 */
+function readRawBody(req, limit = 200 * 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > limit) {
+        reject(new Error("body too large"));
+        req.destroy();
+        return;
+      }
+      chunks.push(c);
+    });
+    req.on("end", () => resolve(Buffer.concat(chunks)));
     req.on("error", reject);
   });
 }
@@ -647,6 +698,56 @@ async function route(req, res) {
     }
     writeMirrorPackages(dedup);
     return send(res, 200, { packages: dedup });
+  }
+
+  // ── launcher 托盘发布物（内网自动更新） ──
+  // 最新版本元数据（同事 launcher 轮询，免鉴权）：{version, file, sha256, size, notes, publishedAt}
+  if (p === "/api/launcher/latest" && req.method === "GET") {
+    const meta = readLauncherReleaseMeta();
+    if (!meta) return send(res, 200, { noRelease: true });
+    // 返回下载绝对路径（内网访问者用 Host 拼；下载走 /api/launcher/download/<file>）
+    return send(res, 200, Object.assign({}, meta));
+  }
+  // 下载 exe（免鉴权，文件名白名单防穿越）
+  if (p === "/api/launcher/download" && req.method === "GET") {
+    const file = url.searchParams.get("file") || "";
+    if (!/^[A-Za-z0-9._-]+$/.test(file)) return send(res, 400, { error: "invalid file" });
+    const fp = path.join(LAUNCHER_RELEASES_DIR, file);
+    if (!fs.existsSync(fp)) return send(res, 404, { error: "not found" });
+    const data = fs.readFileSync(fp);
+    res.writeHead(200, {
+      "Content-Type": "application/octet-stream",
+      "Content-Length": data.length,
+      "Content-Disposition": 'attachment; filename="' + file + '"',
+    });
+    res.end(data);
+    return;
+  }
+  // 上传新版本（管理员鉴权）：POST /api/launcher/releases?v=<ver>&sha256=<hex>，body=exe 字节
+  if (p === "/api/launcher/releases" && req.method === "POST") {
+    if (!authorized(req)) return send(res, 403, { error: "unauthorized" });
+    const ver = (url.searchParams.get("v") || "").trim();
+    const sha256 = (url.searchParams.get("sha256") || "").trim().toLowerCase();
+    const notes = (url.searchParams.get("notes") || "").slice(0, 500);
+    if (!/^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/.test(ver)) return send(res, 400, { error: "版本号格式非法（如 0.3.0）" });
+    if (!/^[a-f0-9]{64}$/.test(sha256)) return send(res, 400, { error: "sha256 必须是 64 位 hex" });
+    let buf;
+    try {
+      buf = await readRawBody(req);
+    } catch (e) {
+      return send(res, 400, { error: e.message });
+    }
+    if (buf.length < 1000 * 1024) return send(res, 400, { error: "exe 过小，非法上传" });
+    // 校验 sha256 与声明一致
+    const crypto = require("node:crypto");
+    const actual = crypto.createHash("sha256").update(buf).digest("hex");
+    if (actual !== sha256) return send(res, 400, { error: "sha256 不匹配（实际 " + actual.slice(0, 16) + "…）" });
+    const file = "launcher-" + ver + ".exe";
+    fs.writeFileSync(path.join(LAUNCHER_RELEASES_DIR, file), buf);
+    const meta = { version: ver, file, sha256, size: buf.length, notes, publishedAt: new Date().toISOString() };
+    writeLauncherReleaseMeta(meta);
+    cleanupLauncherReleases(file);
+    return send(res, 200, { ok: true, release: meta });
   }
 
   // 单文件管理页：页面本身可访问（内网），鉴权在页面内的 token 输入 + 各 API 调用。
