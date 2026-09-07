@@ -128,6 +128,24 @@ node server.js --port 8080 --token 你的管理口令
 }
 ```
 
+## npm 包同步清单（`data/mirror-packages.json`）
+
+「npm 包同步」tab 的清单独立存储（**不**混入 `config.json`，避免下发给客户端触发
+sync.rs 解析未知字段）。结构：
+
+```json
+[
+  { "name": "@deepseek-ai/dsh", "spec": "0.1.2-rc.1" },
+  { "name": "zod", "spec": "latest" }
+]
+```
+
+- `spec`：`latest`（缺省）或精确版本 / dist-tag / semver 范围（同步时传给 launcher
+  mirror 引擎解析依赖树并 publish 到内网）。
+- 同步本身由**管理员本机 launcher 管理能力**执行（外网拉包 → publish 内网），服务端不出网。
+- launcher 需 ≥ 0.3.0 才支持 `pkg@spec`（旧版仅能同步 latest，管理页按 bridge `/health`
+  版本降级提示）。
+
 ## 安全提示
 
 - 面向**内网**部署：拉取 `/api/config` 免鉴权；管理写操作靠 `--token`（请求头 `X-Admin-Token`）。
