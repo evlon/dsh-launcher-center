@@ -33,11 +33,16 @@ node server.js --port 8080 --token 你的管理口令
 | `/api/status` | GET | 查看所有客户端完整状态 | `X-Admin-Token` |
 | `/api/mirror/packages` | GET/POST | 「npm 包同步」清单（非插件通用包镜像，独立文件存储） | `X-Admin-Token` |
 | `/api/registry/sync-status` | GET | 服务端转发查内网 registry 同步状态（支持 `pkg@spec`） | 无 |
+| `/api/launcher/latest` | GET | launcher 托盘最新发布元数据（同事自动更新轮询；无发布返回 `noRelease`） | 无 |
+| `/api/launcher/download?file=` | GET | 下载 launcher 安装 exe（文件名白名单） | 无 |
+| `/api/launcher/releases?v=&sha256=` | POST | 上传 launcher 新版 exe（body 裸字节，sha256 校验） | `X-Admin-Token` |
 | `/admin` | GET | 管理控制台（策略编辑 + 客户端状态 + 健康概览 + 镜像同步） | `X-Admin-Token` |
 
-插件元信息：`/api/plugins/meta?names=a,b,c` 从 npm registry（npmjs 优先 → npmmirror → 内网
-`REGISTRY_OVERRIDE` 环境变量指定）拉取每个插件的描述、最新版本、主页，10 分钟缓存；
-管理页「插件策略」据此展示详情卡片，方便管理员判断每个插件用途。
+插件元信息：`/api/plugins/meta?names=a,b,c` 从 **REGISTRY_OVERRIDE 注入的内网 registry**
+拉取（服务端默认不出外网；仅设 `ALLOW_UPSTREAM=1` 才追加 npmjs→npmmirror 兜底），
+10 分钟缓存；管理页「插件策略」据此展示详情卡片，方便管理员判断每个插件用途。
+launcher 发布物：管理员上传新版 exe 后存 `data/launcher-releases/`，同事 launcher 定期
+查 `/api/launcher/latest` 发现新版 → 下载 → sha256 校验 → 替换自身 exe 升级。
 
 ## 客户端如何接入
 
