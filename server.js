@@ -1057,7 +1057,7 @@ function adminPageHtml() {
         <button class="btn" onclick="checkAllSyncStatus()">⟳ 刷新同步状态</button>
         <button class="btn primary" id="syncAllBtn" onclick="syncAllPlugins()">🚀 同步全部未同步</button>
         <span class="sync-hint" id="syncState"></span>
-        <span style="color:var(--faint);font-size:12px">同步目标：下方「镜像上传」卡片的 registry</span>
+        <span style="color:var(--faint);font-size:12px">同步目标：顶部全局栏「内网 registry」</span>
       </div>
       <div class="plugin-cards" id="pluginList"></div>
       <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
@@ -1108,7 +1108,7 @@ function adminPageHtml() {
         <button class="btn" onclick="checkNpmSyncStatus()">⟳ 刷新同步状态</button>
         <button class="btn primary" id="npmsyncAllBtn" onclick="syncAllNpmPkgs()">🚀 同步全部未同步</button>
         <span class="sync-hint" id="npmsyncState"></span>
-        <span style="color:var(--faint);font-size:12px">同步目标：插件策略页下方「镜像上传」卡片的 registry；需本机管理能力已连接</span>
+        <span style="color:var(--faint);font-size:12px">同步目标：顶部全局栏「内网 registry」；执行需顶部全局栏「本机管理能力」已连接</span>
       </div>
       <div id="npmsyncProgress" style="margin-bottom:12px"></div>
       <div class="plugin-cards" id="npmsyncList"></div>

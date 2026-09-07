@@ -147,7 +147,7 @@ async function saveMirrorSettings(){
   }catch(e){ toast("保存失败："+esc(e.message),"err"); }
 }
 async function startMirrorUpload(){
-  if(!bridgePort){ toast("请先连接管理员本机管理能力（插件策略页顶部）","warn"); return; }
+  if(!bridgePort){ toast("请先在页面顶部全局栏连接「本机管理能力」","warn"); return; }
   const reg=document.getElementById("mirrorRegistry").value.trim()||"http://registry.ict.cmcc";
   const token=document.getElementById("mirrorToken").value.trim();
   if(!token){ toast("请先配置发布 token（镜像设置）","warn"); return; }
@@ -474,7 +474,7 @@ async function renderPlugins(force){
 
 // ── 同步状态查询（服务端转发查内网 registry） ──
 let syncRegistryCache="";
-// 同步目标 registry 单一来源：「镜像上传」卡片的 mirrorRegistry（避免两处配置困惑）
+// 同步目标 registry 单一来源：顶部全局栏「内网 registry」输入框（避免两处配置困惑）
 function syncRegistryUrl(){
   const v=document.getElementById("mirrorRegistry").value.trim();
   return v||"http://registry.ict.cmcc";
@@ -526,14 +526,14 @@ async function syncOnePlugin(i){
   const setBtn=(text,disabled)=>{ if(btn){ btn.textContent=text; btn.disabled=!!disabled; } };
   // 前置条件检查（明确反馈，不只 toast）
   if(!bridgePort){
-    toast("❌ 未连接管理员本机管理能力——请在上方「本机管理能力」输入端口并连接","err");
+    toast("❌ 未连接管理员本机管理能力——请先在页面顶部全局栏连接「本机管理能力」","err");
     return;
   }
   const bridgeTok=localStorage.getItem("bridgeToken")||"";
   const name=(current.plugins||[])[i];
   const token=document.getElementById("mirrorToken").value.trim();
   if(!token){
-    toast("❌ 未配置发布 token——请滚动到下方「镜像上传」卡片填写","err");
+    toast("❌ 未配置发布 token——请在顶部全局栏「内网 registry」填写","err");
     setBtn("同步此插件",false);
     return;
   }
@@ -580,7 +580,7 @@ async function syncAllPlugins(){
   if(!bridgePort){ toast("❌ 未连接管理员本机管理能力——请在上方输入端口并连接","err"); return; }
   const bridgeTok=localStorage.getItem("bridgeToken")||"";
   const token=document.getElementById("mirrorToken").value.trim();
-  if(!token){ toast("❌ 未配置发布 token——请滚动到「镜像上传」卡片填写","err"); return; }
+  if(!token){ toast("❌ 未配置发布 token——请在顶部全局栏「内网 registry」填写","err"); return; }
   const reg=syncRegistryUrl();
   if(btn){ btn.disabled=true; btn.textContent="⏳ 同步中…"; }
   try{
@@ -749,7 +749,7 @@ async function checkNpmSyncStatus(){
 async function syncOneNpmPkg(i,onlyStr){
   const btn=document.getElementById("npmsyncbtn-"+i);
   const setBtn=(text,disabled)=>{ if(btn){ btn.textContent=text; btn.disabled=!!disabled; } };
-  if(!bridgePort){ toast("❌ 未连接管理员本机管理能力——请到「插件策略」页顶部连接","err"); return; }
+  if(!bridgePort){ toast("❌ 未连接管理员本机管理能力——请在页面顶部全局栏连接","err"); return; }
   const item=(mirrorPackages||[])[i];
   if(!item) return;
   // 指定版本/tag 需要 launcher ≥ 0.3.0（支持 pkg@spec）；bridgeVersion 空时放行（未知版本不拦）
@@ -760,7 +760,7 @@ async function syncOneNpmPkg(i,onlyStr){
   }
   const bridgeTok=localStorage.getItem("bridgeToken")||"";
   const token=document.getElementById("mirrorToken").value.trim();
-  if(!token){ toast("❌ 未配置发布 token——请到「插件策略」页「镜像上传」卡片填写","err"); return; }
+  if(!token){ toast("❌ 未配置发布 token——请在顶部全局栏「内网 registry」填写","err"); return; }
   const reg=syncRegistryUrl();
   setBtn("⏳ 同步中…",true);
   try{
@@ -793,7 +793,7 @@ async function syncOneNpmPkg(i,onlyStr){
 async function syncAllNpmPkgs(){
   const items=(mirrorPackages||[]).filter(p=>p);
   if(!items.length){ toast("无同步包","warn"); return; }
-  if(!bridgePort){ toast("❌ 未连接管理员本机管理能力——请到「插件策略」页顶部连接","err"); return; }
+  if(!bridgePort){ toast("❌ 未连接管理员本机管理能力——请在页面顶部全局栏连接","err"); return; }
   const st=document.getElementById("npmsyncState");
   if(st) st.innerHTML='<span style="color:var(--amber)">已逐个发起…</span>';
   for(let i=0;i<items.length;i++){
