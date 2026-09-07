@@ -31,6 +31,8 @@ node server.js --port 8080 --token 你的管理口令
 | `/api/plugins/meta` | GET | 查询插件元信息（描述/最新版/主页，registry 拉取带缓存，`force=1` 绕过） | 无 |
 | `/api/sync` | POST | 客户端上报插件详情/菜单/配置状态 | 无 |
 | `/api/status` | GET | 查看所有客户端完整状态 | `X-Admin-Token` |
+| `/api/mirror/packages` | GET/POST | 「npm 包同步」清单（非插件通用包镜像，独立文件存储） | `X-Admin-Token` |
+| `/api/registry/sync-status` | GET | 服务端转发查内网 registry 同步状态（支持 `pkg@spec`） | 无 |
 | `/admin` | GET | 管理控制台（策略编辑 + 客户端状态 + 健康概览 + 镜像同步） | `X-Admin-Token` |
 
 插件元信息：`/api/plugins/meta?names=a,b,c` 从 npm registry（npmjs 优先 → npmmirror → 内网
@@ -83,6 +85,12 @@ node server.js --port 8080 --token 你的管理口令
 - **插件策略**：应装插件清单（增删、保存下发）+ 每插件卡片展示 npmjs 最新版 / 描述 / 来源；
   卡片徽章显示**内网 registry 同步状态**（✓ 已同步 vX / ⚠ 未同步 / ⬆ npmjs 有新版），
   「⟳ 刷新同步状态」强制重查 npmjs 与内网版本（绕过缓存），有新版时整卡橙色高亮 + 「同步到 vX」按钮。
+- **npm 包同步**：把**任意 npm 包（含全量依赖树）**镜像进内网 registry 的独立清单——用于非插件的
+  通用依赖加速（典型场景：把 dsh 核心 `@deepseek-ai/dsh@0.1.2-rc.1` 及上百依赖同步进内网，同事装
+  dsh / 依赖时经 `mirrorSettings.registry` 走内网提速）。每项支持 `包名`（= latest）或 `包名@版本/tag`；
+  卡片展示 npmjs 上游版本 + 内网同步状态（指定版本时按「该版本是否已存在」判定）+ 单包同步与实时进度。
+  > 依赖本机 launcher「管理能力」≥ 0.3.0 才支持指定版本/tag 同步（旧版仅能同步 latest）；
+  > 同步经管理员本机 launcher 的 mirror 引擎执行（外网拉包 → publish 内网），服务端不出网。
 - **客户端健康概览**：每台客户端插件明细 / 待装 / 托盘菜单 / profile，健康状态（正常 / 缺插件 / 菜单未应用 / 离线）。
 - **内网 registry 镜像**：把「应装插件 + 全部依赖」上传到内网 registry，供无外网的同事客户端安装。
 

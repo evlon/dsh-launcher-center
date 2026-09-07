@@ -38,12 +38,18 @@ const ARGS = parseArgs(process.argv.slice(2));
 // ---------- 数据目录 ----------
 const CONFIG_PATH = path.join(ARGS.data, "config.json");
 const CLIENTS_DIR = path.join(ARGS.data, "clients");
+// 「npm 包同步」清单（通用 npm 包镜像，非插件）——独立文件，不进 config.json
+// 下发给客户端的面（mirrorPackages 仅管理用途，避免 sync.rs/客户端解析未知字段）。
+const MIRROR_PACKAGES_PATH = path.join(ARGS.data, "mirror-packages.json");
 
 function ensureData() {
   fs.mkdirSync(ARGS.data, { recursive: true });
   fs.mkdirSync(CLIENTS_DIR, { recursive: true });
   if (!fs.existsSync(CONFIG_PATH)) {
     writeConfig(defaultConfig());
+  }
+  if (!fs.existsSync(MIRROR_PACKAGES_PATH)) {
+    writeMirrorPackages([]);
   }
 }
 
@@ -87,6 +93,34 @@ function normalizeConfig(cfg) {
 function writeConfig(cfg) {
   cfg.updatedAt = new Date().toISOString();
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(normalizeConfig(cfg), null, 2), "utf8");
+}
+
+// ---------- npm 包同步清单（mirror-packages.json，独立于 config.json） ----------
+
+/** 读「npm 包同步」清单（默认空数组；文件损坏/缺失回退空）。 */
+function readMirrorPackages() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(MIRROR_PACKAGES_PATH, "utf8"));
+    if (Array.isArray(raw)) {
+      return raw
+        .filter((x) => x && typeof x === "object" && typeof x.name === "string" && validPackageName(x.name))
+        .map((x) => ({ name: x.name, spec: typeof x.spec === "string" && x.spec.trim() ? x.spec.trim() : "latest" }));
+    }
+  } catch {
+    /* 文件缺失/损坏 → 空清单 */
+  }
+  return [];
+}
+
+/** 写「npm 包同步」清单（整表替换）。 */
+function writeMirrorPackages(list) {
+  fs.writeFileSync(MIRROR_PACKAGES_PATH, JSON.stringify(list, null, 2), "utf8");
+}
+
+/** spec 合法性：空 = latest；否则仅允许版本号 / dist-tag / semver 范围字符（禁 @ / 空格注入）。 */
+function validMirrorSpec(spec) {
+  if (spec === "" || spec === "latest") return true;
+  return typeof spec === "string" && /^[A-Za-z0-9][A-Za-z0-9.*+^~<>=|\s-]*$/.test(spec.trim()) && !spec.includes("@") && spec.trim().length <= 64;
 }
 
 function listClients() {
@@ -272,6 +306,56 @@ async function fetchPluginsMetaNoCache(names) {
     out.push(meta);
   }
   return out;
+}
+
+/**
+ * 查询某个 registry 上单个包的「同步状态」（是否已存在 + dist-tags.latest 版本）。
+ * 供管理页徽章展示使用：由服务端转发查询（服务端在机房内网直连 registry，
+ * 不走管理员本机浏览器的 uproxy 透明代理，避免代理改写导致 JSON 损坏误判「未同步」）。
+ * 返回 { state: "synced"|"unsynced"|"error", version?: string, registry: string }。
+ */
+async function fetchSyncStatus(name, registryUrl, spec) {
+  const reg = (registryUrl || "").trim().replace(/\/+$/, "") || "http://registry.ict.cmcc";
+  const out = { registry: reg, spec: spec || "latest" };
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(`${reg}/${encodeURIComponent(name).replace(/%2F/gi, "/")}`, {
+      signal: ctrl.signal,
+      // identity：明确不接收压缩，避免中间代理 gzip 改写引入的编码损坏
+      headers: { "User-Agent": "dsh-harness-launcher-admin/0.1", "Accept-Encoding": "identity" },
+    });
+    clearTimeout(timer);
+    if (res.ok) {
+      const j = await res.json();
+      const latest = (j["dist-tags"] && j["dist-tags"].latest) || "";
+      out.version = latest;
+      // 内网已有该包：spec 指定版本/tag 时，需确认该版本确实存在（dist-tags.latest
+      // 不反映 rc/next 等 tag 版本是否已同步）。versions 键命中 = 已同步。
+      if (spec && spec !== "latest" && j.versions) {
+        // spec 可能是 dist-tag：先解 tag → 版本号，再查 versions
+        let target = j["dist-tags"] && j["dist-tags"][spec];
+        if (!target) target = spec; // 直接版本号
+        out.targetVersion = target;
+        out.targetSynced = !!j.versions[target];
+        out.state = out.targetSynced ? "synced" : "unsynced";
+        return out;
+      }
+      out.state = latest ? "synced" : "unsynced";
+      return out;
+    }
+    if (res.status === 404) {
+      out.state = "unsynced";
+      return out;
+    }
+    out.state = "error";
+    out.error = `HTTP ${res.status}`;
+    return out;
+  } catch (e) {
+    out.state = "error";
+    out.error = e && e.name === "AbortError" ? "timeout" : (e && e.message ? e.message : "network");
+    return out;
+  }
 }
 
 // ---------- 路由 ----------
@@ -478,6 +562,74 @@ async function route(req, res) {
     if (!names.length) return send(res, 200, { plugins: [] });
     const plugins = force ? await fetchPluginsMetaNoCache(names) : await fetchPluginsMeta(names);
     return send(res, 200, { plugins });
+  }
+
+  // 同步状态查询（管理页徽章）：服务端转发查内网 registry（浏览器直查会被本机
+  // uproxy 透明代理改写导致 JSON 损坏而误判「未同步」）。registry 取自镜像设置的
+  // mirrorSettings.registry，query 参数 registry 可覆盖（管理页当前表单值优先）。
+  // names 支持 "pkg@spec"（spec=精确版本/dist-tag/semver，用于 npm 包同步 tab），
+  // 无 @ 视为 latest（兼容插件策略页调用）。
+  if (p === "/api/registry/sync-status" && req.method === "GET") {
+    const namesParam = url.searchParams.get("names") || "";
+    const rawNames = namesParam.split(",").map((s) => s.trim()).filter(Boolean);
+    const cfg = normalizeConfig(readConfig());
+    const cfgReg = (cfg.mirrorSettings && cfg.mirrorSettings.registry) || "http://registry.ict.cmcc";
+    const regOverride = (url.searchParams.get("registry") || "").trim();
+    const registry = /^https?:\/\/\S+$/.test(regOverride) ? regOverride : cfgReg;
+    const out = {};
+    for (const raw of rawNames) {
+      // 拆 "pkg@spec"；scoped 包（@scope/name）自身含 @，取最后一个 @
+      const at = raw.lastIndexOf("@");
+      const hasSpec = at > 0;
+      const name = hasSpec ? raw.slice(0, at) : raw;
+      if (!validPackageName(name)) continue;
+      const spec = hasSpec ? raw.slice(at + 1) : "latest";
+      out[name] = await fetchSyncStatus(name, registry, spec);
+    }
+    return send(res, 200, { registry, plugins: out });
+  }
+
+  // 「npm 包同步」清单（管理鉴权）：GET 读取；POST 整表替换（仅管理页使用，
+  // 独立文件 mirror-packages.json 存储，不下发给客户端）。
+  if (p === "/api/mirror/packages" && req.method === "GET") {
+    if (!authorized(req)) return send(res, 403, { error: "unauthorized" });
+    return send(res, 200, { packages: readMirrorPackages() });
+  }
+  if (p === "/api/mirror/packages" && req.method === "POST") {
+    if (!authorized(req)) return send(res, 403, { error: "unauthorized" });
+    let body;
+    try {
+      body = await readBody(req);
+    } catch (e) {
+      return send(res, 400, { error: e.message });
+    }
+    const list = Array.isArray(body.packages) ? body.packages : [];
+    const cleaned = [];
+    for (const x of list) {
+      let name = typeof x === "string" ? x.trim() : (x && typeof x.name === "string" ? x.name.trim() : "");
+      let spec = typeof x === "string" ? "" : (x && typeof x.spec === "string" ? x.spec.trim() : "");
+      // 支持 "pkg@spec" 字符串输入（管理页直接贴，含 scoped：取最后一个 @）
+      if (name.includes("@") && name.lastIndexOf("@") > 0) {
+        const at = name.lastIndexOf("@");
+        const n = name.slice(0, at);
+        const v = name.slice(at + 1);
+        if (validPackageName(n)) {
+          if (!spec && v) spec = v;
+          name = n;
+        }
+      }
+      if (!validPackageName(name)) return send(res, 400, { error: "invalid package name: " + name });
+      if (!validMirrorSpec(spec)) return send(res, 400, { error: "invalid spec: " + spec });
+      cleaned.push({ name, spec: spec || "latest" });
+    }
+    // 去重（name 相同保留后者）
+    const seen = new Set();
+    const dedup = [];
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      if (!seen.has(cleaned[i].name)) { seen.add(cleaned[i].name); dedup.unshift(cleaned[i]); }
+    }
+    writeMirrorPackages(dedup);
+    return send(res, 200, { packages: dedup });
   }
 
   // 单文件管理页：页面本身可访问（内网），鉴权在页面内的 token 输入 + 各 API 调用。
@@ -703,6 +855,7 @@ function adminPageHtml() {
 <nav class="tabs">
   <button class="tab active" data-view="overview">概览</button>
   <button class="tab" data-view="plugins">插件策略</button>
+  <button class="tab" data-view="npmsync">npm 包同步</button>
   <button class="tab" data-view="menu">菜单策略</button>
   <button class="tab" data-view="clients">客户端</button>
 </nav>
@@ -794,6 +947,31 @@ function adminPageHtml() {
         <span class="sync-hint" id="mirrorState"></span>
       </div>
       <div id="mirrorProgress" style="margin-top:12px;font-size:13px"></div>
+    </div>
+  </section>
+
+  <!-- npm 包同步 -->
+  <section id="view-npmsync" class="view">
+    <div class="card">
+      <div class="card-head">
+        <div><h2 class="card-title">npm 包同步清单</h2>
+        <div class="card-desc">把任意 npm 包（含全量依赖树）镜像到下方「镜像上传」卡片的 registry——用于非插件的通用依赖加速，如 dsh 核心 <code>@deepseek-ai/dsh</code>（同事装 dsh / 依赖时经内网 registry 提速）。支持 <code>包名</code>（=latest）或 <code>包名@版本/tag</code>，如 <code>@deepseek-ai/dsh@0.1.2-rc.1</code></div></div>
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <input class="input" id="newNpmPkg" placeholder="输入 npm 包名，如 @deepseek-ai/dsh 或 zod，可带 @版本/tag" style="flex:2" onkeydown="if(event.key==='Enter')addNpmPkg()">
+        <button class="btn primary" onclick="addNpmPkg()">＋ 添加</button>
+      </div>
+      <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <button class="btn" onclick="checkNpmSyncStatus()">⟳ 刷新同步状态</button>
+        <button class="btn primary" id="npmsyncAllBtn" onclick="syncAllNpmPkgs()">🚀 同步全部未同步</button>
+        <span class="sync-hint" id="npmsyncState"></span>
+        <span style="color:var(--faint);font-size:12px">同步目标：插件策略页下方「镜像上传」卡片的 registry；需本机管理能力已连接</span>
+      </div>
+      <div id="npmsyncProgress" style="margin-bottom:12px"></div>
+      <div class="plugin-cards" id="npmsyncList"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+        <span style="font-size:12.5px;color:var(--muted)">清单改动自动保存；「同步到 vX」依赖本机 launcher 管理能力 ≥ 0.3.0（指定版本/tag），旧版仅能同步 latest</span>
+      </div>
     </div>
   </section>
 
