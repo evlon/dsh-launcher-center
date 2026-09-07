@@ -267,12 +267,19 @@ async function loadStatus(){
 }
 // 管理能力：只探测「本机」（管理页所在电脑）的 launcher，不猜其他客户端。
 // 主动 fetch /api/health 确认真的可用，连不上就明确显示未连接。
+// 状态诚实原则：localStorage 里存的端口只是"上次连过"，不代表现在还活着——
+// 每次加载都真实探测：已存端口优先验证，不通则清掉并继续探测候选端口。
 async function autoDetectBridge(){
-  if(bridgePort) return; // 已手动/自动设置
   const st=document.getElementById("bridgeState");
-  // 尝试常用端口（可配置），确认本机管理能力真的开启
-  const candidates=[parseInt(localStorage.getItem("bridgePort")||"0",10)||3410, 3410];
+  const savedPort=parseInt(localStorage.getItem("bridgePort")||"0",10);
+  const candidates=[];
+  // 已存端口（>0 合法）优先验证存活；验证失败会清理，不残留假连接
+  if(savedPort>0&&savedPort<65536) candidates.push(savedPort);
+  candidates.push(3410);
+  const seen=new Set();
   for(const port of candidates){
+    if(seen.has(port)) continue;
+    seen.add(port);
     // fetch 加超时（3s）——防止端口有服务但不响应时永远「检测中…」
     const ctrl=new AbortController();
     const timer=setTimeout(()=>ctrl.abort(),3000);
@@ -296,6 +303,9 @@ async function autoDetectBridge(){
       }
     }catch(e){ clearTimeout(timer); /* 该端口无服务，继续 */ }
   }
+  // 全部失败：清理可能残留的假连接状态，明确显示未连接
+  if(bridgePort){ bridgePort=null; localStorage.removeItem("bridgePort"); }
+  bridgeVersion="";
   st.innerHTML='<span style="color:var(--muted)">本机管理能力未连接——同步/上传需管理员在本机 launcher 托盘「管理能力」开启</span>';
 }
 async function setBridgePort(){
@@ -344,7 +354,9 @@ let bridgePort = (()=>{
   const saved=parseInt(localStorage.getItem("bridgePort")||"0",10);
   return saved>0&&saved<65536 ? saved : null;
 })();
-// 预填端口 + token 输入框（刷新后可见已保存值）
+// 预填端口 + token 输入框（刷新后可见已保存值）。
+// 状态诚实：不直接显示"已连接"——已存端口只是上次连过，是否活着由
+// autoDetectBridge 的真实探测决定（loadStatus → autoDetectBridge 会覆盖此文案）。
 if(bridgePort){
   const fill=()=>{
     const pi=document.getElementById("bridgePortInput");
@@ -352,9 +364,9 @@ if(bridgePort){
     const ti=document.getElementById("bridgeTokenInput");
     const tok=localStorage.getItem("bridgeToken")||"";
     if(ti && tok) ti.value=tok;
-    // 状态栏直接显示已连接（端口已保存）
+    // 预填期间显示检测中，避免"假已连接"；autoDetectBridge 探测后更新真实状态
     const st=document.getElementById("bridgeState");
-    if(st) st.innerHTML='<span style="color:var(--green)">✓ 已连接本机管理能力（端口 '+bridgePort+'）</span>';
+    if(st) st.innerHTML='<span style="color:var(--muted)">检测中…</span>';
   };
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",fill);
   else fill();
