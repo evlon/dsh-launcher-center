@@ -807,8 +807,18 @@ function adminPageHtml() {
   .sync-hint{font-size:12px;color:var(--muted)}
   .sync-hint b{color:var(--text)}
 
+  /* ── 全局基础设施状态栏（本机管理能力 + 内网 registry） ── */
+  .infra-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px 24px;
+    background:#fff;border-bottom:1px solid var(--line);box-shadow:0 1px 0 rgba(20,30,60,.02)}
+  .infra-seg{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto}
+  .infra-ico{font-size:16px;flex-shrink:0}
+  .infra-body{min-width:0;display:flex;flex-direction:column;gap:3px}
+  .infra-label{font-size:10.5px;color:var(--faint);font-weight:600;letter-spacing:.03em;white-space:nowrap}
+  .infra-ctrl{display:flex;align-items:center;gap:6px;flex-wrap:wrap;min-width:0}
+  #bridgeState{font-size:12.5px;font-weight:600;white-space:nowrap}
+
   /* ── Tab 导航 ── */
-  .tabs{position:sticky;top:60px;z-index:19;display:flex;gap:4px;padding:10px 24px 0;
+  .tabs{position:sticky;top:0;z-index:19;display:flex;gap:4px;padding:10px 24px 0;
     background:var(--bg);border-bottom:1px solid var(--line)}
   .tab{appearance:none;border:0;background:transparent;cursor:pointer;font-size:14px;
     padding:9px 16px;color:var(--muted);border-radius:9px 9px 0 0;font-weight:500;
@@ -968,6 +978,48 @@ function adminPageHtml() {
   <button class="btn" onclick="openTokenModal()">🔑 管理口令</button>
 </header>
 
+<!-- 全局基础设施状态栏：本机管理能力 + 内网 registry（所有 tab 共享，单一来源） -->
+<div class="infra-bar" id="infraBar">
+  <div class="infra-seg">
+    <span class="infra-ico">🛰</span>
+    <div class="infra-body">
+      <div class="infra-label">本机管理能力</div>
+      <div class="infra-ctrl">
+        <span id="bridgeState" style="color:var(--muted)">检测中…</span>
+        <input class="input" id="bridgePortInput" placeholder="端口" style="width:70px;padding:3px 8px" value="">
+        <input class="input" id="bridgeTokenInput" type="password" placeholder="连接 token（托盘开启时通知里显示）" style="width:170px;padding:3px 8px" value="">
+        <button class="btn sm primary" id="bridgeBtn" onclick="setBridgePort()">连接</button>
+      </div>
+    </div>
+  </div>
+  <div class="infra-seg" style="flex:1.4">
+    <span class="infra-ico">📦</span>
+    <div class="infra-body">
+      <div class="infra-label">内网 registry（镜像目标 · 同步状态 · dsh 安装源）</div>
+      <div class="infra-ctrl">
+        <input class="input" id="mirrorRegistry" placeholder="内网 registry（如 http://registry.ict.cmcc）" style="flex:1;min-width:220px;padding:3px 8px">
+        <input class="input" type="password" id="mirrorToken" placeholder="发布 token（存服务端）" style="width:170px;padding:3px 8px">
+        <button class="btn sm" onclick="saveMirrorSettings()">保存镜像设置</button>
+      </div>
+    </div>
+  </div>
+  <div class="infra-seg" id="infraDshUrl" style="display:none">
+    <span class="infra-ico">🚀</span>
+    <div class="infra-body">
+      <div class="infra-label">dsh 分发源（可选）</div>
+      <div class="infra-ctrl">
+        <input class="input" id="dshMirrorUrl" placeholder="如 http://registry.ict.cmcc/dsh/" style="width:230px;padding:3px 8px">
+      </div>
+    </div>
+  </div>
+  <div class="infra-seg" style="flex:0 0 auto;display:flex;align-items:center;gap:8px">
+    <button class="btn sm primary" onclick="startMirrorUpload()" id="mirrorStartBtn">🚀 上传全部镜像</button>
+    <span class="sync-hint" id="mirrorState"></span>
+  </div>
+</div>
+<div id="mirrorProgress" style="margin:0 24px;font-size:13px"></div>
+<div id="syncProgress" style="margin:0 24px 0;font-size:13px"></div>
+
 <nav class="tabs">
   <button class="tab active" data-view="overview">概览</button>
   <button class="tab" data-view="plugins">插件策略</button>
@@ -995,15 +1047,7 @@ function adminPageHtml() {
     <div class="card">
       <div class="card-head">
         <div><h2 class="card-title">应装插件清单</h2>
-        <div class="card-desc">客户端任一个 profile 装了即满足；未装的客户端会弹通知，点击托盘「安装」即可补齐</div></div>
-      </div>
-      <div class="bridge-bar" style="background:#f2f5fc;border:1px solid #dbe3f5;border-radius:9px;padding:8px 12px;margin-bottom:14px;font-size:12.5px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <span>🛰 本机管理能力：</span>
-        <span id="bridgeState" style="color:var(--muted)">检测中…</span>
-        <input class="input" id="bridgePortInput" placeholder="端口" style="width:80px;padding:4px 8px" value="" oninput="onBridgeInputChanged()">
-        <input class="input" id="bridgeTokenInput" type="password" placeholder="连接 token（托盘开启时通知里显示）" style="width:200px;padding:4px 8px" value="" oninput="onBridgeInputChanged()">
-        <button class="btn sm primary" id="bridgeBtn" onclick="setBridgePort()">连接</button>
-        <span style="color:var(--faint)">（仅连管理页所在电脑的 launcher；token 见管理员本机托盘「开启管理能力」通知）</span>
+        <div class="card-desc">客户端任一个 profile 装了即满足；未装的客户端会弹通知，点击托盘「安装」即可补齐。镜像目标 registry 见顶部全局栏</div></div>
       </div>
       <div class="row" style="margin-bottom:12px">
         <input class="input" id="newPlugin" placeholder="输入 npm 包名，如 dsh-nested-followups 或 @scope/pkg" onkeydown="if(event.key==='Enter')addPlugin()">
@@ -1015,7 +1059,6 @@ function adminPageHtml() {
         <span class="sync-hint" id="syncState"></span>
         <span style="color:var(--faint);font-size:12px">同步目标：下方「镜像上传」卡片的 registry</span>
       </div>
-      <div id="syncProgress" style="margin-bottom:12px"></div>
       <div class="plugin-cards" id="pluginList"></div>
       <div style="margin-top:16px;display:flex;gap:8px;align-items:center">
         <button class="btn primary" onclick="saveConfig()">保存插件策略</button>
@@ -1025,7 +1068,7 @@ function adminPageHtml() {
     <div class="card">
       <div class="card-head">
         <div><h2 class="card-title">客户端默认配置</h2>
-        <div class="card-desc">下发给客户端的配置默认值（客户端本地显式设置过的不被覆盖）</div></div>
+        <div class="card-desc">下发给客户端的配置默认值（客户端本地显式设置过的不被覆盖）。dsh 安装内网源让同事装/更新 dsh 走内网 registry 加速</div></div>
       </div>
       <div class="row" style="margin-bottom:10px">
         <input class="input" id="cdNpmRegistry" placeholder="npm registry，多个用逗号分隔（如 https://registry.npmmirror.com/, https://registry.npmjs.org/，空=不覆盖）">
@@ -1044,29 +1087,9 @@ function adminPageHtml() {
         <label><input type="checkbox" id="cdUseSystemNode" style="width:auto"> 客户端优先使用系统 node（主版本≥22 则跳过下载自带 node）</label>
       </div>
       <div class="row" style="margin-bottom:10px">
-        <input class="input" id="cdDshRegistry" placeholder="dsh 安装内网源（如 http://registry.ict.cmcc；同事装/更新 dsh 走内网 npm registry 加速，空=不下发）" style="flex:1">
+        <input class="input" id="cdDshRegistry" placeholder="dsh 安装内网源（如 http://registry.ict.cmcc；空=不下发）" style="flex:1">
       </div>
       <div style="margin-top:12px"><button class="btn primary" onclick="saveClientDefaults()">保存客户端默认配置</button></div>
-    </div>
-    <div class="card">
-      <div class="card-head">
-        <div><h2 class="card-title">内网 registry（镜像上传 + 同步状态）</h2>
-        <div class="card-desc">此处配置的 registry 同时用于：① 上方插件清单的「同步状态」检查与「同步」按钮；② 把「应装插件 + 全部依赖」上传（镜像）到该 registry</div></div>
-      </div>
-      <div class="row" style="margin-bottom:10px">
-        <input class="input" id="mirrorRegistry" placeholder="内网 registry（如 http://registry.ict.cmcc）">
-        <input class="input" type="password" id="mirrorToken" placeholder="发布 token（NODE_AUTH_TOKEN 值，存服务端，调用时传递）" style="max-width:320px">
-      </div>
-      <div class="row" style="margin-bottom:10px">
-        <input class="input" id="dshMirrorUrl" placeholder="dsh 分发源（可选，如 http://registry.ict.cmcc/dsh/；客户端更新/切换 dsh 版本时优先走此内网源）" style="flex:1">
-      </div>
-      <div style="margin-bottom:10px;font-size:12.5px;color:var(--muted)">token 存于服务端 config.json；点击「开始上传」时经管理能力临时传给管理员 launcher（内存使用，不落盘客户端）。</div>
-      <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
-        <button class="btn primary" onclick="saveMirrorSettings()">保存镜像设置</button>
-        <button class="btn" onclick="startMirrorUpload()" id="mirrorStartBtn">🚀 开始上传到内网 registry</button>
-        <span class="sync-hint" id="mirrorState"></span>
-      </div>
-      <div id="mirrorProgress" style="margin-top:12px;font-size:13px"></div>
     </div>
   </section>
 
@@ -1075,7 +1098,7 @@ function adminPageHtml() {
     <div class="card">
       <div class="card-head">
         <div><h2 class="card-title">npm 包同步清单</h2>
-        <div class="card-desc">把任意 npm 包（含全量依赖树）镜像到下方「镜像上传」卡片的 registry——用于非插件的通用依赖加速，如 dsh 核心 <code>@deepseek-ai/dsh</code>（同事装 dsh / 依赖时经内网 registry 提速）。支持 <code>包名</code>（=latest）或 <code>包名@版本/tag</code>，如 <code>@deepseek-ai/dsh@0.1.2-rc.1</code></div></div>
+        <div class="card-desc">把任意 npm 包（含全量依赖树）镜像到顶部全局栏的内网 registry——用于非插件的通用依赖加速，如 dsh 核心 <code>@deepseek-ai/dsh</code>（同事装 dsh / 依赖时经内网 registry 提速）。支持 <code>包名</code>（=latest）或 <code>包名@版本/tag</code>，如 <code>@deepseek-ai/dsh@0.1.2-rc.1</code></div></div>
       </div>
       <div class="row" style="margin-bottom:12px">
         <input class="input" id="newNpmPkg" placeholder="输入 npm 包名，如 @deepseek-ai/dsh 或 zod，可带 @版本/tag" style="flex:2" onkeydown="if(event.key==='Enter')addNpmPkg()">
