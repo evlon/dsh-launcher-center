@@ -322,7 +322,7 @@ async function setBridgePort(){
   renderPlugins();
   toast("已连接本机管理能力（端口 "+p+"，v"+esc(bridgeVersion||"?")+"）","ok");
 }
-function refreshAll(){ loadConfig(); loadStatus(); toast("已刷新","ok"); }
+function refreshAll(){ loadConfig(); loadStatus(); loadLauncherRelease(); toast("已刷新","ok"); }
 
 // ── 插件策略 ──
 const pluginMetaCache = {}; // name -> meta（npmjs 上游元信息）
@@ -1007,6 +1007,65 @@ function renderClients(){
       +'<span title="'+esc(c.lastSyncAt||"")+'">'+fmtTime(c.lastSyncAt)+'</span></div>'
       +'</div>';
   }).join("");
+}
+
+// ── Launcher 托盘发布 ──
+async function loadLauncherRelease(){
+  const el=document.getElementById("launcherReleaseCurrent");
+  if(!el) return;
+  try{
+    const r=await fetch("/api/launcher/latest",{headers:headers(false)});
+    const j=await r.json();
+    if(j&&j.noRelease){
+      el.innerHTML='<div class="chip dim" style="padding:6px 14px">当前无发布物 —— 同事 launcher 不触发升级</div>';
+      return;
+    }
+    if(j&&j.version){
+      const dt=j.publishedAt?(" · "+fmtTime(j.publishedAt)):"";
+      el.innerHTML='<div class="chips" style="align-items:center"><span class="chip" style="background:var(--green-bg);color:var(--green)">✓ 当前发布 v'+esc(j.version)+'</span>'+
+        '<span class="chip dim">'+esc(j.file)+'</span>'+
+        '<span class="chip dim">'+Math.round(j.size/1024/1024)+' MB</span>'+
+        (j.notes?'<span class="chip dim">'+esc(j.notes)+'</span>':'')+
+        '</div><div style="font-size:12px;color:var(--muted);margin-top:6px">发布 '+dt+' · sha256 '+esc((j.sha256||"").slice(0,16))+'…</div>';
+      return;
+    }
+    el.innerHTML='<div class="chip dim">查询失败</div>';
+  }catch(e){ el.innerHTML='<div class="chip dim">查询失败：'+esc(e.message)+'</div>'; }
+}
+async function uploadLauncherRelease(){
+  const btn=document.getElementById("launcherUploadBtn");
+  const st=document.getElementById("launcherUploadState");
+  const fileInput=document.getElementById("newLauncherExe");
+  const ver=document.getElementById("newLauncherVersion").value.trim();
+  const notes=document.getElementById("newLauncherNotes").value.trim();
+  const f=fileInput&&fileInput.files&&fileInput.files[0];
+  if(!f){ toast("请选择 launcher exe 文件","warn"); return; }
+  if(!ver){ toast("请填版本号","warn"); return; }
+  if(!/^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/.test(ver)){ toast("版本号格式非法（如 0.3.0）","warn"); return; }
+  if(f.size<1000*1024){ toast("exe 过小（<1MB），不像有效二进制","warn"); return; }
+  if(btn) btn.disabled=true;
+  if(st) st.innerHTML='<span style="color:var(--amber)">上传中 '+Math.round(f.size/1024/1024)+' MB…</span>';
+  try{
+    const buf=await f.arrayBuffer();
+    const r=await fetch("/api/launcher/releases?v="+encodeURIComponent(ver),{
+      method:"POST",
+      headers:Object.assign(headers(true),{"X-Notes":notes||""}),
+      body:buf
+    });
+    const j=await r.json();
+    if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
+    toast("✅ launcher v"+esc(ver)+" 已发布（sha256 "+esc(j.release.sha256.slice(0,12))+"…）","ok");
+    if(st) st.innerHTML='<span style="color:var(--green)">✅ 已发布 v'+esc(ver)+'</span>';
+    document.getElementById("newLauncherExe").value="";
+    document.getElementById("newLauncherVersion").value="";
+    document.getElementById("newLauncherNotes").value="";
+    loadLauncherRelease();
+  }catch(e){
+    if(st) st.innerHTML='';
+    toast("❌ 发布失败："+esc(e.message),"err");
+  }finally{
+    if(btn) btn.disabled=false;
+  }
 }
 
 // ── 启动 ──

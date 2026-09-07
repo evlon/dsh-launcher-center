@@ -423,7 +423,7 @@ async function route(req, res) {
   // CORS（管理页与客户端可能跨源）
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-Admin-Token, X-Notes");
   if (req.method === "OPTIONS") {
     res.writeHead(204);
     res.end();
@@ -723,14 +723,14 @@ async function route(req, res) {
     res.end(data);
     return;
   }
-  // 上传新版本（管理员鉴权）：POST /api/launcher/releases?v=<ver>&sha256=<hex>，body=exe 字节
+  // 上传新版本（管理员鉴权）：POST /api/launcher/releases?v=<ver>，body=exe 裸字节。
+  // sha256 由服务端自算（管理页 http 非 secure context，前端 crypto.subtle 不可用）；
+  // notes 经 X-Notes 请求头传（避免 query 中文编码问题）。
   if (p === "/api/launcher/releases" && req.method === "POST") {
     if (!authorized(req)) return send(res, 403, { error: "unauthorized" });
     const ver = (url.searchParams.get("v") || "").trim();
-    const sha256 = (url.searchParams.get("sha256") || "").trim().toLowerCase();
-    const notes = (url.searchParams.get("notes") || "").slice(0, 500);
+    const notes = (req.headers["x-notes"] || "").slice(0, 500);
     if (!/^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/.test(ver)) return send(res, 400, { error: "版本号格式非法（如 0.3.0）" });
-    if (!/^[a-f0-9]{64}$/.test(sha256)) return send(res, 400, { error: "sha256 必须是 64 位 hex" });
     let buf;
     try {
       buf = await readRawBody(req);
@@ -738,10 +738,8 @@ async function route(req, res) {
       return send(res, 400, { error: e.message });
     }
     if (buf.length < 1000 * 1024) return send(res, 400, { error: "exe 过小，非法上传" });
-    // 校验 sha256 与声明一致
     const crypto = require("node:crypto");
-    const actual = crypto.createHash("sha256").update(buf).digest("hex");
-    if (actual !== sha256) return send(res, 400, { error: "sha256 不匹配（实际 " + actual.slice(0, 16) + "…）" });
+    const sha256 = crypto.createHash("sha256").update(buf).digest("hex");
     const file = "launcher-" + ver + ".exe";
     fs.writeFileSync(path.join(LAUNCHER_RELEASES_DIR, file), buf);
     const meta = { version: ver, file, sha256, size: buf.length, notes, publishedAt: new Date().toISOString() };
@@ -976,6 +974,7 @@ function adminPageHtml() {
   <button class="tab" data-view="npmsync">npm 包同步</button>
   <button class="tab" data-view="menu">菜单策略</button>
   <button class="tab" data-view="clients">客户端</button>
+  <button class="tab" data-view="launcher">Launcher 发布</button>
 </nav>
 
 <main>
@@ -1092,6 +1091,32 @@ function adminPageHtml() {
       <div class="plugin-cards" id="npmsyncList"></div>
       <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
         <span style="font-size:12.5px;color:var(--muted)">清单改动自动保存；「同步到 vX」依赖本机 launcher 管理能力 ≥ 0.3.0（指定版本/tag），旧版仅能同步 latest</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Launcher 发布 -->
+  <section id="view-launcher" class="view">
+    <div class="card">
+      <div class="card-head">
+        <div><h2 class="card-title">Launcher 托盘发布</h2>
+        <div class="card-desc">上传 launcher 新版 exe 到服务端，同事 launcher 周期检查 <code>/api/launcher/latest</code> 发现新版后自动下载升级（内网自托管，版本号 + sha256 校验）。当前无发布物时同事端不升级</div></div>
+      </div>
+      <div id="launcherReleaseCurrent" style="margin-bottom:14px"></div>
+      <div class="row" style="margin-bottom:10px">
+        <input class="input" id="newLauncherExe" type="file" accept=".exe" style="flex:2">
+        <input class="input" id="newLauncherVersion" placeholder="版本号（如 0.3.0，与 package.json 一致）" style="flex:1">
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <input class="input" id="newLauncherNotes" placeholder="更新说明（可选，同事托盘更新提示里显示）" style="flex:1">
+      </div>
+      <div class="row" style="margin-bottom:12px">
+        <button class="btn primary" id="launcherUploadBtn" onclick="uploadLauncherRelease()">⬆ 上传并发布</button>
+        <span class="sync-hint" id="launcherUploadState"></span>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted)">
+        上传前先在本机构建新版本 exe（<code>cargo build --release</code> 产物即可，绿色版分发），
+        服务端自动计算 sha256 校验、替换 latest 元数据并清理旧产物。同事 launcher 需 ≥ 0.3.0 才具备自动更新能力。
       </div>
     </div>
   </section>
