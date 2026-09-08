@@ -297,7 +297,28 @@ async function autoDetectBridge(){
           document.getElementById("bridgeTokenInput").value=saved;
           // 自动连接成功也持久化（刷新不丢）
           localStorage.setItem("bridgePort",String(port));
-          st.innerHTML='<span style="color:var(--green)">✓ 已连接本机管理能力（端口 '+port+'，v'+esc(j.version||"?")+'）</span>';
+          // 诚实授权状态：health 免 token 只证明服务在，不证明 token 有效。
+          // 有已存 token 时实测一次（带 token 调 meta 查询，包名不存在也走完校验返回
+          // ok:false/HTTP 而非 invalid token），确认「已连接且已授权」。
+          let authed=!!saved;
+          if(authed){
+            try{
+              const ac=new AbortController();
+              const at=setTimeout(()=>ac.abort(),6000);
+              const ar=await fetch("http://127.0.0.1:"+port+"/api/registry/meta?name=dsh-harness-launcher-selfcheck&token="+encodeURIComponent(saved),{headers:headers(false),signal:ac.signal});
+              clearTimeout(at);
+              const aj=await ar.json().catch(()=>null);
+              // ok:false + error 含 invalid token = 未授权；其余（真查询失败/包不存在）视为已授权
+              authed = !(aj&&aj.ok===false&&/invalid.*token/i.test(aj.error||""));
+            }catch(e){ authed=false; /* 探测超时/失败：保守按未授权处理 */ }
+          }
+          localStorage.setItem("bridgeAuthed",authed?"1":"0");
+          st.innerHTML = authed
+            ? '<span style="color:var(--green)">✓ 已连接本机管理能力（端口 '+port+'，v'+esc(j.version||"?")+'）</span>'
+            : '<span style="color:var(--amber)">⚠ 已连接端口 '+port+' 但 token 未授权——请填入托盘显示的管理 token</span>';
+          // 连接状态变化后刷新插件/包卡片（loadConfig 可能已用旧状态渲染过）
+          if(document.getElementById("pluginList")&&document.getElementById("pluginList").innerHTML) renderPlugins();
+          if(document.getElementById("npmsyncList")&&document.getElementById("npmsyncList").innerHTML) renderNpmSync();
           return;
         }
       }
@@ -327,10 +348,30 @@ async function setBridgePort(){
   // 保存连接 token（无条件写，空则清除旧值）
   const tok=document.getElementById("bridgeTokenInput").value.trim();
   localStorage.setItem("bridgeToken",tok);
-  // 清缓存强制刷新插件信息
+  // 验证 token 授权状态：带 token 实测（空 token 必未授权，诚实提示而不是假装可用）
+  const st=document.getElementById("bridgeState");
+  let authed=!!tok;
+  if(authed){
+    try{
+      const ac=new AbortController();
+      const at=setTimeout(()=>ac.abort(),6000);
+      const ar=await fetch("http://127.0.0.1:"+p+"/api/registry/meta?name=dsh-harness-launcher-selfcheck&token="+encodeURIComponent(tok),{headers:headers(false),signal:ac.signal});
+      clearTimeout(at);
+      const aj=await ar.json().catch(()=>null);
+      authed = !(aj&&aj.ok===false&&/invalid.*token/i.test(aj.error||""));
+    }catch(e){ authed=false; }
+  }
+  localStorage.setItem("bridgeAuthed",authed?"1":"0");
+  if(st){
+    st.innerHTML = authed
+      ? '<span style="color:var(--green)">✓ 已连接本机管理能力（端口 '+p+'，v'+esc(bridgeVersion||"?")+'）</span>'
+      : '<span style="color:var(--amber)">⚠ 已连接端口 '+p+' 但 token 未授权——请填入托盘显示的管理 token</span>';
+  }
+  // 清缓存强制刷新插件信息 + npm 包同步（上游版本来自 bridge，token 变化直接影响能否拿到）
   Object.keys(pluginMetaCache).forEach(k=>delete pluginMetaCache[k]);
   renderPlugins();
-  toast("已连接本机管理能力（端口 "+p+"，v"+esc(bridgeVersion||"?")+"）","ok");
+  if(document.getElementById("npmsyncList")&&document.getElementById("npmsyncList").innerHTML) renderNpmSync();
+  toast(authed?"已连接本机管理能力（端口 "+p+"，v"+esc(bridgeVersion||"?")+"）":"已连接端口但 token 未授权","ok");
 }
 function refreshAll(){ loadConfig(); loadStatus(); loadLauncherRelease(); toast("已刷新","ok"); }
 
@@ -371,6 +412,10 @@ if(bridgePort){
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",fill);
   else fill();
 }
+// 元信息缓存：只缓存「真上游」（registry 指向外网 npm 源）的结果。
+// 服务端 /api/plugins/meta 只能查内网 registry（网络边界设计），其返回的 latest
+// 是内网已有版本，不是 npmjs 上游版本——绝不能混入 pluginMetaCache 冒充上游。
+// 上游版本缺失时返回空 latest，渲染端显示「未连接管理能力，无法查询 npmjs 上游」。
 async function fetchPluginMetas(names, force){
   if(force){
     // 强制刷新：清掉这批的缓存，上游/内网都重查（用户点「刷新同步状态」= 最新事实）
@@ -379,31 +424,31 @@ async function fetchPluginMetas(names, force){
   const need = names.filter(n=>!pluginMetaCache[n]);
   if(need.length){
     // 优先走管理员本机管理能力（外网代理网关）：服务端不直接出外网
-    let got = false;
     if(bridgePort){
-      try{
-        const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/meta?name="+encodeURIComponent(need.join(","))+"&token="+encodeURIComponent(localStorage.getItem("bridgeToken")||""),{headers:headers(false)});
-        const j=await r.json();
-        if(j.ok){
-          // 本 API 单包查询：逐个补齐
-          const meta=j.meta;
-          if(meta && meta.name){ pluginMetaCache[meta.name]=meta; got=true; }
-        }
-      }catch(e){ /* 本地 API 不可达，降级服务端 */ }
+      const bridgeTok=localStorage.getItem("bridgeToken")||"";
+      // 逐包查（bridge 单包 API）；token 无效返回 {ok:false}——明确报错而不是
+      // 静默降级服务端（服务端只有内网版本，冒充上游会误判「已是最新/已同步」）
+      const failed=[];
+      for(const n of need){
+        try{
+          const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/meta?name="+encodeURIComponent(n)+"&token="+encodeURIComponent(bridgeTok),{headers:headers(false)});
+          const j=await r.json();
+          if(j&&j.ok&&j.meta&&j.meta.name){ pluginMetaCache[j.meta.name]=j.meta; }
+          else failed.push(n);
+        }catch(e){ failed.push(n); /* 本地 API 不可达，见下 */ }
+      }
+      // bridge 可达但个别失败（token 错/网络）：不降级服务端（会拿内网数据冒充上游），
+      // 由渲染端显示「查询失败」；bridge 完全不可达（fetch 抛错）同样不降级。
+      void failed;
     }
-    if(!got){
-      // 降级：服务端直查（若服务端有网）
-      try{
-        const r=await fetch("/api/plugins/meta?names="+encodeURIComponent(need.join(","))+(force?"&force=1":""),{headers:headers(false)});
-        const j=await r.json();
-        (j.plugins||[]).forEach(m=>{ pluginMetaCache[m.name]=m; });
-      }catch(e){ /* 拉取失败：卡片显示占位 */ }
-    }
+    // 注意：不再降级服务端 /api/plugins/meta 作为上游来源——服务端仅内网数据，
+    // 语义错误（把内网已同步版本当 npmjs 最新）。上游只能来自本机管理能力 bridge。
   }
   return names.map(n=>pluginMetaCache[n]).filter(Boolean);
 }
 // npm 包同步专用：逐包经 bridge /api/registry/meta 查上游元信息（bridge 单包查询可靠；
-// 多包时逐个串行），bridge 不可达降级服务端 /api/plugins/meta。force 清缓存。
+// 多包时逐个串行）。force 清缓存。上游只能来自本机管理能力 bridge——服务端只有内网
+// 版本，不做降级来源（避免把内网版本当 npmjs 上游，误判「已是最新」）。
 async function fetchNpmMetas(names, force){
   const out=[];
   if(!names.length) return out;
@@ -413,28 +458,15 @@ async function fetchNpmMetas(names, force){
     if(pluginMetaCache[n]) out.push(pluginMetaCache[n]);
     else missing.push(n);
   }
-  if(missing.length){
-    let got=0;
-    if(bridgePort){
-      const bridgeTok=localStorage.getItem("bridgeToken")||"";
-      for(const n of missing){
-        try{
-          const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/meta?name="+encodeURIComponent(n)+"&token="+encodeURIComponent(bridgeTok),{headers:headers(false)});
-          const j=await r.json();
-          if(j&&j.ok&&j.meta&&j.meta.name){ pluginMetaCache[j.meta.name]=j.meta; out.push(j.meta); got++; }
-        }catch(e){ /* 单包失败跳过，降级服务端补查 */ }
-      }
-    }
-    // bridge 未命中全部 → 剩余降级服务端（服务端有网时兜底）
-    const rest=missing.filter(n=>!pluginMetaCache[n]);
-    if(rest.length){
+  if(missing.length&&bridgePort){
+    const bridgeTok=localStorage.getItem("bridgeToken")||"";
+    for(const n of missing){
       try{
-        const r=await fetch("/api/plugins/meta?names="+encodeURIComponent(rest.join(","))+(force?"&force=1":""),{headers:headers(false)});
+        const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/meta?name="+encodeURIComponent(n)+"&token="+encodeURIComponent(bridgeTok),{headers:headers(false)});
         const j=await r.json();
-        (j.plugins||[]).forEach(m=>{ pluginMetaCache[m.name]=m; out.push(m); });
-      }catch(e){ /* 拉取失败：卡片显示占位 */ }
+        if(j&&j.ok&&j.meta&&j.meta.name){ pluginMetaCache[j.meta.name]=j.meta; out.push(j.meta); }
+      }catch(e){ /* 单包失败跳过：该包无上游版本信息，渲染端显示占位 */ }
     }
-    void got;
   }
   return names.map(n=>pluginMetaCache[n]).filter(Boolean);
 }
@@ -449,9 +481,10 @@ async function renderPlugins(force){
     +'<div class="pfoot"><button class="btn sm danger" onclick="removePlugin('+i+')">移除</button></div>'
     +'</div>').join("");
   const metas=await fetchPluginMetas(names,force);
-  // 查询内网 registry 同步状态（浏览器直查，registry CORS *）
+  // 查询内网 registry 同步状态（经服务端转发）
   const syncStates=await checkRegistryStatus(names);
   lastSyncStates=syncStates; // 供 checkAllSyncStatus 汇总提示
+  const upstreamKnown=!!bridgePort; // 上游版本只有 bridge（外网网关）在连时才有意义
   names.forEach((p,i)=>{
     const card=document.getElementById("pcard-"+i);
     if(!card) return;
@@ -459,8 +492,14 @@ async function renderPlugins(force){
     const ss=syncStates[p]||{state:"checking"};
     const upstream=(m&&m.latest)||"";
     // 是否有 npmjs 新版本可同步：内网已同步该版本号，且 内网版本 < npmjs latest
-    const hasNew = ss.state==="synced" && upstream && cmpVer(ss.version,upstream)<0;
-    const ver='<span class="pver">npmjs v'+esc(upstream||"?")+'</span>';
+    const hasNew = upstreamKnown && ss.state==="synced" && upstream && cmpVer(ss.version,upstream)<0;
+    // 版本标注诚实：只有确实查到 npmjs 上游版本才写 "npmjs vX"；bridge 未连接/查询失败时
+    // 明确显示「—」（绝不把服务端查到的内网版本冒充 npmjs 上游——此前因此误显示 0.1.6）
+    const ver = upstream
+      ? '<span class="pver">npmjs v'+esc(upstream)+'</span>'
+      : (upstreamKnown
+          ? '<span class="pver" style="color:var(--red)">上游查询失败</span>'
+          : '<span class="pver" style="color:var(--muted)">npmjs 上游 —（未连管理能力）</span>');
     const src=m&&m.registry?'<span class="src">'+esc(m.registry)+'</span>':'';
     const desc=m&&m.description?esc(m.description):'<span class="missing">（无描述）</span>';
     const home=m&&m.homepage?'<a href="'+esc(m.homepage)+'" target="_blank" rel="noopener">主页 ↗</a>':'';
@@ -525,6 +564,11 @@ async function checkAllSyncStatus(){
   toast("正在检查同步状态（含 npmjs 最新版本）…","ok");
   try{
     await renderPlugins(true);
+    // 上游版本只有 bridge 在连时才有意义；bridge 未连时明确提示而不是误报「均已最新」
+    if(!bridgePort){
+      document.getElementById("syncState").innerHTML='<span style="color:var(--amber)">⚠ 本机管理能力未连接——无法对比 npmjs 上游，仅显示内网同步状态</span>';
+      return;
+    }
     const upd = current.plugins.filter(n=>{ const ss=lastSyncStates[n]; return ss&&ss.state==="synced"&&pluginMetaCache[n]&&cmpVer(ss.version,pluginMetaCache[n].latest)<0; });
     document.getElementById("syncState").innerHTML = upd.length
       ? '<span style="color:var(--amber)"><b>'+upd.length+'</b> 个插件 npmjs 有新版可同步</span>'
@@ -733,7 +777,11 @@ async function renderNpmSync(force){
       const only = target ? (p.name+"@"+target) : p.name;
       syncBtn='<button class="btn sm primary sync-btn'+(hasUp?' up':'')+'" id="npmsyncbtn-'+i+'" onclick="syncOneNpmPkg('+i+',\''+esc(only)+'\')">'+label+'</button>';
     }
-    const ver='<span class="pver">npmjs v'+esc(upstream||"?")+'</span>';
+    const ver = upstream
+      ? '<span class="pver">npmjs v'+esc(upstream)+'</span>'
+      : (bridgePort
+          ? '<span class="pver" style="color:var(--red)">上游查询失败</span>'
+          : '<span class="pver" style="color:var(--muted)">npmjs 上游 —（未连管理能力）</span>');
     const src=m&&m.registry?'<span class="src">'+esc(m.registry)+'</span>':'';
     const desc=m&&m.description?esc(m.description).slice(0,120):'<span class="missing">（无描述）</span>';
     card.className="pcard"+(hasUp?" update":"");
