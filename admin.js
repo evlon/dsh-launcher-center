@@ -298,17 +298,18 @@ async function autoDetectBridge(){
           // 自动连接成功也持久化（刷新不丢）
           localStorage.setItem("bridgePort",String(port));
           // 诚实授权状态：health 免 token 只证明服务在，不证明 token 有效。
-          // 有已存 token 时实测一次（带 token 调 meta 查询，包名不存在也走完校验返回
-          // ok:false/HTTP 而非 invalid token），确认「已连接且已授权」。
+          // 有已存 token 时实测一次。自检用 mirror/progress（只读本地进度、不触外网）：
+          // token 错 → 403 invalid bridge token；token 对 → 200（即便无上传进度也 ok:true）。
+          // 不用 /api/registry/meta 自检——那会真去查 npmjs 外网，管理员本机断网时会误报未授权。
           let authed=!!saved;
           if(authed){
             try{
               const ac=new AbortController();
               const at=setTimeout(()=>ac.abort(),6000);
-              const ar=await fetch("http://127.0.0.1:"+port+"/api/registry/meta?name=dsh-harness-launcher-selfcheck&token="+encodeURIComponent(saved),{headers:headers(false),signal:ac.signal});
+              const ar=await fetch("http://127.0.0.1:"+port+"/api/registry/mirror/progress?token="+encodeURIComponent(saved),{headers:headers(false),signal:ac.signal});
               clearTimeout(at);
               const aj=await ar.json().catch(()=>null);
-              // ok:false + error 含 invalid token = 未授权；其余（真查询失败/包不存在）视为已授权
+              // ok:false + error 含 invalid token = 未授权；其余（真查询失败/无进度）视为已授权
               authed = !(aj&&aj.ok===false&&/invalid.*token/i.test(aj.error||""));
             }catch(e){ authed=false; /* 探测超时/失败：保守按未授权处理 */ }
           }
@@ -348,14 +349,15 @@ async function setBridgePort(){
   // 保存连接 token（无条件写，空则清除旧值）
   const tok=document.getElementById("bridgeTokenInput").value.trim();
   localStorage.setItem("bridgeToken",tok);
-  // 验证 token 授权状态：带 token 实测（空 token 必未授权，诚实提示而不是假装可用）
+  // 验证 token 授权状态：带 token 实测（空 token 必未授权，诚实提示而不是假装可用）。
+  // 自检用 mirror/progress（只读本地、不触外网；token 错 → invalid bridge token）。
   const st=document.getElementById("bridgeState");
   let authed=!!tok;
   if(authed){
     try{
       const ac=new AbortController();
       const at=setTimeout(()=>ac.abort(),6000);
-      const ar=await fetch("http://127.0.0.1:"+p+"/api/registry/meta?name=dsh-harness-launcher-selfcheck&token="+encodeURIComponent(tok),{headers:headers(false),signal:ac.signal});
+      const ar=await fetch("http://127.0.0.1:"+p+"/api/registry/mirror/progress?token="+encodeURIComponent(tok),{headers:headers(false),signal:ac.signal});
       clearTimeout(at);
       const aj=await ar.json().catch(()=>null);
       authed = !(aj&&aj.ok===false&&/invalid.*token/i.test(aj.error||""));
