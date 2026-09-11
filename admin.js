@@ -1084,15 +1084,42 @@ async function loadLauncherRelease(){
     }
     if(j&&j.version){
       const dt=j.publishedAt?(" · "+fmtTime(j.publishedAt)):"";
+      const dlUrl=location.origin+"/api/launcher/download?file="+encodeURIComponent(j.file);
+      const shareUrl=location.origin+"/download";
       el.innerHTML='<div class="chips" style="align-items:center"><span class="chip" style="background:var(--green-bg);color:var(--green)">✓ 当前发布 v'+esc(j.version)+'</span>'+
         '<span class="chip dim">'+esc(j.file)+'</span>'+
         '<span class="chip dim">'+Math.round(j.size/1024/1024)+' MB</span>'+
         (j.notes?'<span class="chip dim">'+esc(j.notes)+'</span>':'')+
-        '</div><div style="font-size:12px;color:var(--muted);margin-top:6px">发布 '+dt+' · sha256 '+esc((j.sha256||"").slice(0,16))+'…</div>';
+        '</div><div style="font-size:12px;color:var(--muted);margin-top:6px">发布 '+dt+' · sha256 '+esc((j.sha256||"").slice(0,16))+'…</div>'
+        +'<div style="margin-top:10px;padding:10px 12px;background:var(--card-bg,#f7f8fa);border:1px solid var(--border,#e3e6ea);border-radius:8px">'
+        +'<div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">📤 分享给同事的下载链接（免鉴权，可直接发群）：</div>'
+        +'<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'
+        +'<code id="launcherShareUrl" style="flex:1;min-width:260px;padding:6px 8px;background:#fff;border:1px solid var(--border,#e3e6ea);border-radius:6px;font-size:12.5px;word-break:break-all">'+esc(shareUrl)+'</code>'
+        +'<button class="btn" type="button" onclick="copyLauncherLink(\''+esc(shareUrl)+'\')">复制链接</button>'
+        +'<a class="btn" href="'+esc(shareUrl)+'" target="_blank" rel="noopener">打开下载页</a>'
+        +'</div>'
+        +'<div style="font-size:12px;color:var(--muted);margin-top:8px">直链 exe（可右键另存）：<a href="'+esc(dlUrl)+'" style="color:var(--blue,#2563eb)">'+esc(dlUrl)+'</a></div>'
+        +'</div>';
       return;
     }
     el.innerHTML='<div class="chip dim">查询失败</div>';
   }catch(e){ el.innerHTML='<div class="chip dim">查询失败：'+esc(e.message)+'</div>'; }
+}
+// 复制 launcher 下载分享链接（管理页用；失败回退到手动选择）
+function copyLauncherLink(url){
+  const done=()=>toast&&toast("链接已复制，可直接发给同事","ok");
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(done).catch(()=>fallbackCopy(url,done));
+  }else{ fallbackCopy(url,done); }
+}
+function fallbackCopy(url,done){
+  try{
+    const ta=document.createElement("textarea");
+    ta.value=url; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.select();
+    document.execCommand("copy"); document.body.removeChild(ta);
+    done&&done();
+  }catch(e){ window.prompt("复制下面的链接：",url); }
 }
 async function uploadLauncherRelease(){
   const btn=document.getElementById("launcherUploadBtn");
