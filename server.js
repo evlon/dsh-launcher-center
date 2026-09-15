@@ -92,6 +92,11 @@ function defaultConfig() {
     managedMenu: { enabled: false, quickLinks: [] },
     clientDefaults: {},
     mirrorSettings: { registry: "http://registry.ict.cmcc", tokenValue: "" },
+    // 环境默认配置：{ "<namespace>": { "<key>": "<value>" } }
+    // 落到客户端 $DSH_HOME/settings.yaml，供各插件读取内网服务地址等统一值。
+    // 遵循「只填空缺」——用户在设置页显式改过的不覆盖。
+    // 管理员在这里改一处，全员生效（客户端下次同步时应用）。
+    envDefaults: {},
     updatedAt: new Date().toISOString(),
     baseUrl: "",
   };
@@ -105,7 +110,7 @@ function readConfig() {
   }
 }
 
-/** 归一化旧版 config：补 managedMenu / clientDefaults / mirrorSettings 默认值，保证旧数据平滑升级。 */
+/** 归一化旧版 config：补 managedMenu / clientDefaults / mirrorSettings / envDefaults 默认值，保证旧数据平滑升级。 */
 function normalizeConfig(cfg) {
   if (cfg && typeof cfg === "object") {
     if (typeof cfg.managedMenu !== "object" || cfg.managedMenu === null) {
@@ -116,6 +121,9 @@ function normalizeConfig(cfg) {
     }
     if (typeof cfg.mirrorSettings !== "object" || cfg.mirrorSettings === null) {
       cfg.mirrorSettings = { registry: "http://registry.ict.cmcc", tokenValue: "" };
+    }
+    if (typeof cfg.envDefaults !== "object" || cfg.envDefaults === null) {
+      cfg.envDefaults = {};
     }
     if (typeof cfg.plugins !== "object" || !Array.isArray(cfg.plugins)) cfg.plugins = [];
   }
@@ -286,6 +294,26 @@ function authorized(req) {
   if (!ARGS.token) return true; // 未设 token 时管理操作仅限内网（不鉴权）
   const h = req.headers["x-admin-token"];
   return typeof h === "string" && h === ARGS.token;
+}
+
+/**
+ * 修正 HTTP 头里的 UTF-8 中文。
+ *
+ * 背景（实测踩坑）：Node 按 RFC 7230 把请求头值解码为 **latin1**，而客户端
+ * 实际发送的是 UTF-8 字节。直接使用会得到乱码（如「默认」→「é»è®¤」）。
+ * 做法：把 latin1 字符串按字节还原，再以 UTF-8 重新解码。
+ * 若原文是纯 ASCII（还原后仍为 ASCII）则保持原样，不影响英文 notes。
+ */
+function decodeHeaderUtf8(value) {
+  if (typeof value !== "string" || value === "") return "";
+  try {
+    const bytes = Buffer.from(value, "latin1");
+    const decoded = bytes.toString("utf8");
+    // 还原后若含替换字符（U+FFFD），说明原本就不是 UTF-8 → 保留原值
+    return decoded.includes("\uFFFD") ? value : decoded;
+  } catch {
+    return value;
+  }
 }
 
 // ---------- 插件元信息（registry 查询 + 缓存） ----------
@@ -517,6 +545,43 @@ async function route(req, res) {
       }
       cfg.clientDefaults = cleaned;
     }
+    // 环境默认配置（envDefaults）：{ "<namespace>": { "<key>": "<value>" } }
+    // 落到客户端 $DSH_HOME/settings.yaml（各插件读内网服务地址等统一值）。
+    // 校验：两层对象；键名限字母数字-_；值限字符串（数字/布尔会转字符串）；
+    //       拒绝数组/对象值（避免覆盖插件的复杂结构，如 models 列表）。
+    if (body.envDefaults !== undefined) {
+      const ed = body.envDefaults;
+      if (typeof ed !== "object" || ed === null || Array.isArray(ed)) {
+        return send(res, 400, { error: "envDefaults 必须是对象" });
+      }
+      const cleanedEd = {};
+      const KEY_RE = /^[A-Za-z0-9_-]+$/;
+      for (const [ns, kv] of Object.entries(ed)) {
+        if (!KEY_RE.test(ns)) {
+          return send(res, 400, { error: `envDefaults 的 namespace「${ns}」非法（限字母数字-_）` });
+        }
+        if (typeof kv !== "object" || kv === null || Array.isArray(kv)) {
+          return send(res, 400, { error: `envDefaults.${ns} 必须是对象（{key: value}）` });
+        }
+        const cleanKv = {};
+        for (const [k, v] of Object.entries(kv)) {
+          if (!KEY_RE.test(k)) {
+            return send(res, 400, { error: `envDefaults.${ns} 的键「${k}」非法（限字母数字-_）` });
+          }
+          if (typeof v === "string") {
+            cleanKv[k] = v.trim();
+          } else if (typeof v === "number" || typeof v === "boolean") {
+            cleanKv[k] = String(v);
+          } else {
+            return send(res, 400, {
+              error: `envDefaults.${ns}.${k} 只支持字符串/数字/布尔（数组与对象会覆盖插件的复杂配置，请改在插件设置页配）`,
+            });
+          }
+        }
+        cleanedEd[ns] = cleanKv;
+      }
+      cfg.envDefaults = cleanedEd;
+    }
     // 镜像上传设置（mirrorSettings）：registry 合法 URL + tokenValue（发布凭证，存服务端）
     if (body.mirrorSettings !== undefined) {
       const ms = body.mirrorSettings;
@@ -729,7 +794,7 @@ async function route(req, res) {
   if (p === "/api/launcher/releases" && req.method === "POST") {
     if (!authorized(req)) return send(res, 403, { error: "unauthorized" });
     const ver = (url.searchParams.get("v") || "").trim();
-    const notes = (req.headers["x-notes"] || "").slice(0, 500);
+    const notes = decodeHeaderUtf8(req.headers["x-notes"]).slice(0, 500);
     if (!/^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/.test(ver)) return send(res, 400, { error: "版本号格式非法（如 0.3.0）" });
     let buf;
     try {
