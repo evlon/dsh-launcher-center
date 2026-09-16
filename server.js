@@ -94,7 +94,9 @@ function defaultConfig() {
     mirrorSettings: { registry: "http://registry.ict.cmcc", tokenValue: "" },
     // 环境默认配置：{ "<namespace>": { "<key>": "<value>" } }
     // 落到客户端 $DSH_HOME/settings.yaml，供各插件读取内网服务地址等统一值。
-    // 遵循「只填空缺」——用户在设置页显式改过的不覆盖。
+    // 覆盖策略（客户端侧实现，见 launcher 的 env_defaults.rs）：
+    //   - 环境地址类键（认证域名/服务地址等）→ 服务端有值就【强制覆盖】纠正存量旧值；
+    //   - 其余键（个人凭据等）→ 遵循「只填空缺」，用户已设的不覆盖。
     // 管理员在这里改一处，全员生效（客户端下次同步时应用）。
     envDefaults: {},
     updatedAt: new Date().toISOString(),
