@@ -12,9 +12,8 @@
  */
 'use strict'
 
-const fs = require('node:fs')
-const path = require('node:path')
 const { send } = require('../http')
+const { readAdminScript } = require('../adminScript')
 const { adminPageHtml } = require('../views/adminPage')
 const { downloadPageHtml } = require('../views/downloadPage')
 
@@ -30,13 +29,12 @@ function adminPage(ctx, req, res) {
   res.end(adminPageHtml())
 }
 
-/** GET /admin.js：管理页脚本（独立文件，避免模板字符串转义问题；每次读盘，改即生效）。 */
+/** GET /admin.js：管理页脚本（由 src/web/*.js 按序拼接；每次读盘，改即生效）。 */
 function adminScript(ctx, req, res) {
-  const jsPath = path.join(ctx.paths.rootDir, 'admin.js')
   try {
-    const js = fs.readFileSync(jsPath, 'utf8')
+    const { code } = readAdminScript(ctx.paths.rootDir)
     res.writeHead(200, { 'Content-Type': 'application/javascript; charset=utf-8', 'Cache-Control': 'no-store' })
-    res.end(js)
+    res.end(code)
   } catch (e) {
     return send(res, 500, { error: 'admin.js 读取失败: ' + e.message })
   }

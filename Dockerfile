@@ -11,9 +11,11 @@ FROM node:22-slim
 WORKDIR /app
 
 # 复制服务端代码与静态资源
-# 注意：server.js 只是入口薄壳，业务实现在 src/ 下（分层：routes/store/views）。
+# 注意：server.js 只是入口薄壳，业务实现在 src/ 下：
+#   src/routes/  端点处理    src/store/  数据读写
+#   src/views/   页面 HTML   src/web/    管理页脚本模块（服务端按序拼成 /admin.js）
+# 已不再有独立的 admin.js 文件（管理页脚本由 src/web/*.js 拼接生成）。
 COPY server.js ./
-COPY admin.js ./
 COPY package.json ./
 COPY src/ ./src/
 
