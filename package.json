@@ -6,7 +6,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node tests/envdefaults.selftest.cjs"
+    "test": "node tests/unit.test.cjs && node tests/envdefaults.selftest.cjs",
+    "test:golden": "node tests/golden-probe.cjs server.js tests/golden-after.json && node tests/compare-golden.cjs tests/golden-before.json tests/golden-after.json"
   },
   "engines": {
     "node": ">=18"

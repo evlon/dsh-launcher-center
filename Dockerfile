@@ -11,9 +11,11 @@ FROM node:22-slim
 WORKDIR /app
 
 # 复制服务端代码与静态资源
+# 注意：server.js 只是入口薄壳，业务实现在 src/ 下（分层：routes/store/views）。
 COPY server.js ./
 COPY admin.js ./
 COPY package.json ./
+COPY src/ ./src/
 
 # 数据目录（挂 PVC）
 RUN mkdir -p /data && chown -R node:node /app /data

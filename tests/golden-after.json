@@ -1,0 +1,778 @@
+{
+  "server": "server.js",
+  "node": "v24.19.0",
+  "count": 69,
+  "results": [
+    {
+      "name": "GET /api/config (公开，初始)",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"version\":3,\"plugins\":[],\"profilePlugins\":{},\"managedMenu\":{\"enabled\":false,\"quickLinks\":[]},\"clientDefaults\":{},\"mirrorSettings\":{\"registry\":\"http://registry.ict.cmcc\",\"tokenValue\":\"\"},\"envDefaults\":{},\"updatedAt\":\"<TS>\",\"baseUrl\":\"\"}"
+    },
+    {
+      "name": "GET /api/status 无 token → 403",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "name": "GET /api/status 有 token",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"clients\":[]}"
+    },
+    {
+      "name": "GET /  → 302 /admin",
+      "status": 302,
+      "headers": {
+        "cache-control": "no-store",
+        "location": "/admin",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": ""
+    },
+    {
+      "name": "GET /admin",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": {
+        "__sha256": "018417f505561922cf004c24f5fa3004f8565a545e4863a551d43db8dfd5cce9",
+        "__len": 25176
+      }
+    },
+    {
+      "name": "GET /admin.js",
+      "status": 200,
+      "headers": {
+        "content-type": "application/javascript; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": {
+        "__sha256": "5061e97b180452949506e54eca02dd297937e22b4f8ee436891c3c37d76815ef",
+        "__len": 66956
+      }
+    },
+    {
+      "name": "GET /download",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": {
+        "__sha256": "5f230d98624fbf5e8a921da63614a4bf527b1051a8238f360e44edd6d2f50639",
+        "__len": 1940
+      }
+    },
+    {
+      "name": "GET /nope → 404",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"not found\"}"
+    },
+    {
+      "name": "OPTIONS 预检 → 204",
+      "status": 204,
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": ""
+    },
+    {
+      "name": "GET /api/launcher/latest（无发布）",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"noRelease\":true}"
+    },
+    {
+      "name": "POST /api/config 无 token → 403",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "name": "POST /api/config 完整合法",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"version\":3,\"plugins\":[\"dsh-codebuddy-models\",\"dsh-matrix-agent\"],\"profilePlugins\":{\"web\":[\"dsh-codebuddy-models\"],\"matrix\":[\"dsh-matrix-agent\",\"dsh-himarket\"],\"matrix-dev\":[]},\"managedMenu\":{\"enabled\":true,\"quickLinks\":[{\"label\":\"门户\",\"url\":\"https://portal.example.com\"}]},\"clientDefaults\":{\"npmRegistry\":[\"https://registry.npmmirror.com/\",\"https://registry.npmjs.org/\"],\"ghMirrorPrefix\":[\"https://ghfast.top/\"],\"port\":3180,\"syncIntervalSecs\":300,\"profile\":\"matrix\",\"useSystemNode\":true,\"dshRegistry\":\"http://registry.ict.cmcc\"},\"mirrorSettings\":{\"registry\":\"http://registry.ict.cmcc\",\"tokenValue\":\"tok-123\",\"dshMirrorUrl\":\"http://registry.ict.cmcc/dsh/\"},\"envDefaults\":{\"matrix\":{\"homeserverUrl\":\"https://mx.example.com\"},\"llm\":{\"retries\":\"3\",\"debug\":\"true\"}},\"updatedAt\":\"<TS>\",\"baseUrl\":\"https://conf.example.com\"}"
+    },
+    {
+      "name": "GET /api/config 回读",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"version\":3,\"plugins\":[\"dsh-codebuddy-models\",\"dsh-matrix-agent\"],\"profilePlugins\":{\"web\":[\"dsh-codebuddy-models\"],\"matrix\":[\"dsh-matrix-agent\",\"dsh-himarket\"],\"matrix-dev\":[]},\"managedMenu\":{\"enabled\":true,\"quickLinks\":[{\"label\":\"门户\",\"url\":\"https://portal.example.com\"}]},\"clientDefaults\":{\"npmRegistry\":[\"https://registry.npmmirror.com/\",\"https://registry.npmjs.org/\"],\"ghMirrorPrefix\":[\"https://ghfast.top/\"],\"port\":3180,\"syncIntervalSecs\":300,\"profile\":\"matrix\",\"useSystemNode\":true,\"dshRegistry\":\"http://registry.ict.cmcc\"},\"mirrorSettings\":{\"registry\":\"http://registry.ict.cmcc\",\"tokenValue\":\"tok-123\",\"dshMirrorUrl\":\"http://registry.ict.cmcc/dsh/\"},\"envDefaults\":{\"matrix\":{\"homeserverUrl\":\"https://mx.example.com\"},\"llm\":{\"retries\":\"3\",\"debug\":\"true\"}},\"updatedAt\":\"<TS>\",\"baseUrl\":\"https://conf.example.com\"}"
+    },
+    {
+      "name": "POST /api/config plugins 含非法包名",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid package names: Bad Pkg!\"}"
+    },
+    {
+      "name": "POST /api/config managedMenu 非对象",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"managedMenu 必须是对象\"}"
+    },
+    {
+      "name": "POST /api/config managedMenu.enabled 非布尔",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"managedMenu.enabled 必须是布尔值\"}"
+    },
+    {
+      "name": "POST /api/config managedMenu.quickLinks 非数组",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"managedMenu.quickLinks 必须是数组\"}"
+    },
+    {
+      "name": "POST /api/config quickLink url 非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"managedMenu.quickLinks 含非法项（label 非空、url 需 http/https）\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults 非对象",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults 必须是对象\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults.npmRegistry 类型错",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults.npmRegistry 必须是字符串或字符串数组\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults.port 越界",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults.port 必须在 1-65535\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults.syncIntervalSecs 过小",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults.syncIntervalSecs 必须 >= 30\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults.profile 非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults.profile 非法\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults.useSystemNode 非布尔",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults.useSystemNode 必须是布尔值\"}"
+    },
+    {
+      "name": "POST /api/config clientDefaults.dshRegistry 非 URL",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"clientDefaults.dshRegistry 必须是 http(s) 地址或空串\"}"
+    },
+    {
+      "name": "POST /api/config envDefaults 非对象",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"envDefaults 必须是对象\"}"
+    },
+    {
+      "name": "POST /api/config envDefaults namespace 非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"envDefaults 的 namespace「bad ns!」非法（限字母数字-_）\"}"
+    },
+    {
+      "name": "POST /api/config envDefaults 值非对象",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"envDefaults.ns 必须是对象（{key: value}）\"}"
+    },
+    {
+      "name": "POST /api/config envDefaults 键非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"envDefaults.ns 的键「bad key!」非法（限字母数字-_）\"}"
+    },
+    {
+      "name": "POST /api/config envDefaults 数组值被拒",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"envDefaults.ns.models 只支持字符串/数字/布尔（数组与对象会覆盖插件的复杂配置，请改在插件设置页配）\"}"
+    },
+    {
+      "name": "POST /api/config mirrorSettings 非对象",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"mirrorSettings 必须是对象\"}"
+    },
+    {
+      "name": "POST /api/config mirrorSettings.registry 非 URL",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"mirrorSettings.registry 必须是 http(s) 地址\"}"
+    },
+    {
+      "name": "POST /api/config mirrorSettings.tokenValue 非字符串",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"mirrorSettings.tokenValue 必须是字符串\"}"
+    },
+    {
+      "name": "POST /api/config mirrorSettings.dshMirrorUrl 非 URL",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"mirrorSettings.dshMirrorUrl 必须是 http(s) 地址\"}"
+    },
+    {
+      "name": "POST /api/config profilePlugins 非对象",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"profilePlugins 必须是对象（{ profile: [pkg, ...] }）\"}"
+    },
+    {
+      "name": "POST /api/config profilePlugins profile 名非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"profilePlugins 的 profile 名「bad name!」非法（限字母数字-_）\"}"
+    },
+    {
+      "name": "POST /api/config profilePlugins 值非数组",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"profilePlugins.web 必须是数组\"}"
+    },
+    {
+      "name": "POST /api/config profilePlugins 含非法包名",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"profilePlugins.web 含非法包名：Bad Pkg!\"}"
+    },
+    {
+      "name": "POST /api/config 畸形 JSON",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid json: Expected property name or '}' in JSON at position 1 (line 1 column 2)\"}"
+    },
+    {
+      "name": "POST /api/sync 合法",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"ok\":true,\"lastSyncAt\":\"<TS>\"}"
+    },
+    {
+      "name": "POST /api/sync clientId 非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid clientId\"}"
+    },
+    {
+      "name": "POST /api/sync 畸形 JSON",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid json: Unexpected token 'o', \\\"not json\\\" is not valid JSON\"}"
+    },
+    {
+      "name": "GET /api/status（含 1 台客户端）",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"clients\":[{\"clientId\":\"golden-client-0001\",\"hostname\":\"HOST-A\",\"dshVersion\":\"0.1.2-rc.1\",\"launcherVersion\":\"0.3.7\",\"installed\":[\"dsh-codebuddy-models\"],\"pending\":[\"dsh-matrix-agent\"],\"plugins\":[{\"name\":\"dsh-codebuddy-models\",\"version\":\"0.1.6\",\"description\":\"desc\",\"profile\":\"web\",\"client\":true}],\"menu\":[{\"label\":\"门户\",\"url\":\"https://portal.example.com\"}],\"menuApplied\":true,\"profiles\":[\"web\",\"matrix\"],\"configState\":{\"profile\":\"web\",\"port\":3180},\"bridgeStatus\":{\"enabled\":true,\"port\":3410},\"offline\":false,\"lastSyncAt\":\"<TS>\"}]}"
+    },
+    {
+      "name": "GET /api/plugins/meta",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"plugins\":[{\"name\":\"dsh-codebuddy-models\",\"latest\":\"0.1.7\",\"description\":\"stub description for dsh-codebuddy-models\",\"homepage\":\"https://example.invalid/dsh-codebuddy-models\",\"repository\":\"\",\"registry\":\"内网\"},{\"name\":\"dsh-matrix-agent\",\"latest\":\"0.2.3\",\"description\":\"stub description for dsh-matrix-agent\",\"homepage\":\"https://example.invalid/dsh-matrix-agent\",\"repository\":\"\",\"registry\":\"内网\"}]}"
+    },
+    {
+      "name": "GET /api/plugins/meta force=1",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"plugins\":[{\"name\":\"dsh-codebuddy-models\",\"latest\":\"0.1.7\",\"description\":\"stub description for dsh-codebuddy-models\",\"homepage\":\"https://example.invalid/dsh-codebuddy-models\",\"repository\":\"\",\"registry\":\"内网\"}]}"
+    },
+    {
+      "name": "GET /api/plugins/meta 空 names",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"plugins\":[]}"
+    },
+    {
+      "name": "GET /api/plugins/meta 非法名过滤",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"plugins\":[]}"
+    },
+    {
+      "name": "GET /api/registry/sync-status 单包",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"registry\":\"http://127.0.0.1:18201\",\"plugins\":{\"dsh-codebuddy-models\":{\"registry\":\"http://127.0.0.1:18201\",\"spec\":\"latest\",\"version\":\"0.1.7\",\"state\":\"synced\"}}}"
+    },
+    {
+      "name": "GET /api/registry/sync-status 带 spec",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"registry\":\"http://127.0.0.1:18201\",\"plugins\":{\"dsh-codebuddy-models\":{\"registry\":\"http://127.0.0.1:18201\",\"spec\":\"0.1.6\",\"version\":\"0.1.7\",\"targetVersion\":\"0.1.6\",\"targetSynced\":true,\"state\":\"synced\"}}}"
+    },
+    {
+      "name": "GET /api/registry/sync-status spec 未同步",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"registry\":\"http://127.0.0.1:18201\",\"plugins\":{\"dsh-codebuddy-models\":{\"registry\":\"http://127.0.0.1:18201\",\"spec\":\"9.9.9\",\"version\":\"0.1.7\",\"targetVersion\":\"9.9.9\",\"targetSynced\":false,\"state\":\"unsynced\"}}}"
+    },
+    {
+      "name": "GET /api/registry/sync-status scoped 包",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"registry\":\"http://127.0.0.1:18201\",\"plugins\":{\"@scope/pkg\":{\"registry\":\"http://127.0.0.1:18201\",\"spec\":\"latest\",\"version\":\"1.2.3\",\"state\":\"synced\"}}}"
+    },
+    {
+      "name": "GET /api/registry/sync-status 不存在→unsynced",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"registry\":\"http://127.0.0.1:18201\",\"plugins\":{\"no-such-pkg-xyz\":{\"registry\":\"http://127.0.0.1:18201\",\"spec\":\"latest\",\"state\":\"unsynced\"}}}"
+    },
+    {
+      "name": "GET /api/registry/sync-status 非法 registry 回落",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"registry\":\"http://registry.ict.cmcc\",\"plugins\":{\"dsh-matrix-agent\":{\"registry\":\"http://registry.ict.cmcc\",\"spec\":\"latest\",\"state\":\"error\",\"error\":\"timeout\"}}}"
+    },
+    {
+      "name": "GET /api/mirror/packages 无 token → 403",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "name": "GET /api/mirror/packages 初始",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"packages\":[]}"
+    },
+    {
+      "name": "POST /api/mirror/packages 合法（含 pkg@spec 字符串与 scoped）",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid spec: ^3.0.0\"}"
+    },
+    {
+      "name": "GET /api/mirror/packages 回读",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"packages\":[]}"
+    },
+    {
+      "name": "POST /api/mirror/packages 非法包名",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid package name: Bad Pkg!\"}"
+    },
+    {
+      "name": "POST /api/mirror/packages 非法 spec",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid spec: bad@spec\"}"
+    },
+    {
+      "name": "POST /api/mirror/packages 空载荷",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"packages\":[]}"
+    },
+    {
+      "name": "POST /api/launcher/releases 无 token → 403",
+      "status": 403,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"unauthorized\"}"
+    },
+    {
+      "name": "POST /api/launcher/releases 版本号非法",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"版本号格式非法（如 0.3.0）\"}"
+    },
+    {
+      "name": "POST /api/launcher/releases 过小",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"exe 过小，非法上传\"}"
+    },
+    {
+      "name": "POST /api/launcher/releases 合法（含中文 notes）",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"ok\":true,\"release\":{\"version\":\"9.9.9\",\"file\":\"launcher-9.9.9.exe\",\"sha256\":\"2fa94ac8bf513bba66397f356015260c337ca760a804c4ddff14f92a83c9350b\",\"size\":1048704,\"notes\":\"v9.9.9: 中文说明 修复\",\"publishedAt\":\"<TS>\"}}"
+    },
+    {
+      "name": "GET /api/launcher/latest（有发布）",
+      "status": 200,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"version\":\"9.9.9\",\"file\":\"launcher-9.9.9.exe\",\"sha256\":\"2fa94ac8bf513bba66397f356015260c337ca760a804c4ddff14f92a83c9350b\",\"size\":1048704,\"notes\":\"v9.9.9: 中文说明 修复\",\"publishedAt\":\"<TS>\"}"
+    },
+    {
+      "name": "GET /api/launcher/download 合法",
+      "status": 200,
+      "headers": {
+        "content-type": "application/octet-stream",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": {
+        "__sha256": "2fa94ac8bf513bba66397f356015260c337ca760a804c4ddff14f92a83c9350b",
+        "__len": 1048704
+      }
+    },
+    {
+      "name": "GET /api/launcher/download 穿越尝试",
+      "status": 400,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"invalid file\"}"
+    },
+    {
+      "name": "GET /api/launcher/download 不存在",
+      "status": 404,
+      "headers": {
+        "content-type": "application/json; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": "{\"error\":\"not found\"}"
+    },
+    {
+      "name": "GET /download（有发布）",
+      "status": 200,
+      "headers": {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "access-control-allow-origin": "*",
+        "access-control-allow-methods": "GET, POST, OPTIONS"
+      },
+      "body": {
+        "__sha256": "06b7c6735d190eec3267c92efb9f389be7aafa88e07b8e4b802001cc5e4383f9",
+        "__len": 2579
+      }
+    }
+  ],
+  "childStderrTail": ""
+}
