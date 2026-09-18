@@ -87,15 +87,9 @@ async function renderNpmSync(force){
   // 1) 上游元信息（latest 版本/tag）：bridge /meta 单包逐个查（可靠）；bridge 不可达则降级服务端
   const names=items.map(p=>p.name);
   const metas=await fetchNpmMetas(names,force);
-  // 2) 内网同步状态：带 spec 经服务端查询
+  // 2) 内网同步状态：带 spec 查询（bridge 优先、服务端降级，见 queryInternalSyncStatus）
   const queryNames=items.map(p=>p.spec&&p.spec!=="latest"?p.name+"@"+p.spec:p.name);
-  const reg=syncRegistryUrl();
-  const syncStates={};
-  try{
-    const r=await fetch("/api/registry/sync-status?names="+encodeURIComponent(queryNames.join(","))+"&registry="+encodeURIComponent(reg),{headers:headers(false)});
-    const j=await r.json();
-    if(r.ok&&j&&j.plugins) Object.assign(syncStates,j.plugins);
-  }catch(e){ /* 全部 error 态 */ }
+  const syncStates=await queryInternalSyncStatus(queryNames);
   items.forEach((p,i)=>{
     const card=document.getElementById("npcard-"+i);
     if(!card) return;
@@ -236,14 +230,13 @@ async function syncAllNpmPkgs(){
   if(st) st.innerHTML='';
   renderNpmSync();
 }
-// 查询单个 npm 包内网是否已同步
+// 查询单个 npm 包内网是否已同步（bridge 优先、服务端降级）
 async function npmPkgIsSynced(item){
   try{
     const q=item.spec&&item.spec!=="latest"?item.name+"@"+item.spec:item.name;
-    const r=await fetch("/api/registry/sync-status?names="+encodeURIComponent(q)+"&registry="+encodeURIComponent(syncRegistryUrl()),{headers:headers(false)});
-    const j=await r.json();
-    const s=j&&j.plugins&&j.plugins[item.name];
-    return s&&s.state==="synced";
+    const res=await queryInternalSyncStatus([q]);
+    const s=res[item.name];
+    return !!(s&&s.state==="synced");
   }catch(e){ return false; }
 }
 // 等待 bridge 镜像任务结束（供 syncAllNpmPkgs 串行）

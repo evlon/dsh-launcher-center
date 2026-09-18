@@ -2,7 +2,8 @@
  * 插件策略：应装清单、上游版本对比、一键同步。
  *
  * ## 版本语义（踩坑记录，勿混淆）
- *   - 「内网版本」：来自服务端 /api/registry/sync-status（内网 registry 现有版本）
+ *   - 「内网版本」：来自 queryInternalSyncStatus（bridge 优先查内网 registry，
+ *                   bridge 不可用时降级服务端转发；见 bridge.js）
  *   - 「npmjs 上游版本」：只能来自 bridge（/api/registry/meta）——服务端查不到外网
  * 卡片上的 "npmjs vX" 必须是**真上游**；bridge 不可用时显示占位，
  * 绝不拿内网版本冒充（曾因此把内网 0.1.6 显示成 npmjs 0.1.6）。
@@ -98,24 +99,15 @@ async function checkRegistryStatus(names){
   const out={};
   if(!names.length) return out;
   names.forEach(p=>{ out[p]={state:"checking"}; });
-  const reg=syncRegistryUrl();
-  try{
-    // 经服务端 /api/registry/sync-status 转发查询：服务端机房内网直连 registry，
-    // 不会被管理页所在本机的 uproxy 透明代理改写 JSON（此前浏览器直查会误判「未同步」）
-    const r=await fetch("/api/registry/sync-status?names="+encodeURIComponent(names.join(","))
-      +"&registry="+encodeURIComponent(reg),{headers:headers(false)});
-    const j=await r.json();
-    if(r.ok&&j&&j.plugins){
-      for(const p of names){
-        const s=j.plugins[p];
-        if(!s){ out[p]={state:"error"}; continue; }
-        out[p]={state:s.state==="synced"?"synced":(s.state==="unsynced"?"unsynced":"error"),
-          version:s.version||"", error:s.error||""};
-      }
-    }
-  }catch(e){
-    // 服务端接口不可达：全部标记 error（显示「查询失败」而不是误判「未同步」）
-    names.forEach(p=>{ out[p]={state:"error",error:"server-unreachable"}; });
+  // 经统一入口查询（bridge 优先、服务端降级）：见 bridge.js queryInternalSyncStatus。
+  // 生产环境服务端在机房集群内、未必能访问内网 registry（实测 CoreDNS 拒绝解析
+  // registry.ict.cmcc → 服务端查询全 error → 徽章一律「查询失败」），故由管理员
+  // 本机 launcher bridge 承担该查询（它既能出外网又能访问内网 registry）。
+  const res=await queryInternalSyncStatus(names);
+  for(const p of names){
+    const s=res[p];
+    // 无结果 = 两个来源都没查到 → error（显示「查询失败」而不是误判「未同步」）
+    out[p]=s?normalizeSyncEntry(s):{state:"error",error:"both-sources-unreachable"};
   }
   return out;
 }

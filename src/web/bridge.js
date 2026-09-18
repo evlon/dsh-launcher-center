@@ -263,3 +263,60 @@ async function setBridgePort(){
 }
 function refreshAll(){ loadConfig(); loadStatus(); loadLauncherRelease(); toast("已刷新","ok"); }
 
+// ── 内网 registry 同步状态查询（单一入口） ──
+/**
+ * 查内网 registry 上各包的同步状态（徽章用）。
+ *
+ * ## 为什么优先走 bridge（架构修正）
+ * 生产环境中心服务端在机房集群内，**未必能解析/访问内网 registry**——实测集群
+ * CoreDNS 拒绝解析 registry.ict.cmcc，导致服务端 /api/registry/sync-status 全部
+ * 返回 error，管理页徽章一律「⚠ 查询失败」。
+ * 按网络边界设计，registry 查询应由**管理员本机 launcher** 承担：它既能出外网
+ * 又能访问内网 registry，是天然的桥接者（服务端只是记录者）。
+ *
+ * ## 降级策略
+ *   bridge 可用（已连 + token 授权）→ bridge /api/registry/sync-status（首选）
+ *   bridge 不可用/失败          → 服务端 /api/registry/sync-status（兼容旧版
+ *                                 launcher 0.3.10 及以前没有该端点的情况）
+ *
+ * @param {string[]} names 包名数组，可含 pkg@spec
+ * @returns {Promise<Object>} name → { state, version, error, targetVersion?, targetSynced? }
+ */
+async function queryInternalSyncStatus(names){
+  const out={};
+  if(!names||!names.length) return out;
+  const reg=syncRegistryUrl();
+  const q=encodeURIComponent(names.join(","))+"&registry="+encodeURIComponent(reg);
+  // 1) 首选：本机管理能力 bridge（生产拓扑下唯一可靠的查询者）
+  if(bridgePort){
+    try{
+      const bridgeTok=localStorage.getItem("bridgeToken")||"";
+      const ctrl=new AbortController();
+      const timer=setTimeout(()=>ctrl.abort(),15000);
+      const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/sync-status?names="+q+"&token="+encodeURIComponent(bridgeTok),{headers:headers(false),signal:ctrl.signal});
+      clearTimeout(timer);
+      const j=await r.json().catch(()=>null);
+      if(r.ok&&j&&j.ok&&j.plugins) return j.plugins;
+      // 旧版 launcher（<0.3.11）无此端点 → 404/not found，落到服务端降级
+    }catch(e){ /* bridge 不可达/超时：降级服务端 */ }
+  }
+  // 2) 降级：服务端转发（要求服务端能访问内网 registry；开发机同机时成立）
+  try{
+    const r=await fetch("/api/registry/sync-status?names="+q,{headers:headers(false)});
+    const j=await r.json();
+    if(r.ok&&j&&j.plugins) return j.plugins;
+  }catch(e){ /* 服务端也不可达：返回空，由调用方标记 error */ }
+  return out;
+}
+/** 把查询结果归一化为统一的 { state, version, error } 结构（两来源字段一致，容错兜底）。 */
+function normalizeSyncEntry(s){
+  if(!s) return {state:"error"};
+  return {
+    state: s.state==="synced"?"synced":(s.state==="unsynced"?"unsynced":"error"),
+    version: s.version||"",
+    error: s.error||"",
+    targetVersion: s.targetVersion||"",
+    targetSynced: !!s.targetSynced,
+  };
+}
+
