@@ -12,6 +12,35 @@ const path = require('node:path')
 /** clientId 合法性：字母数字与连字符，长度 8-64（防路径穿越）。 */
 const CLIENT_ID_RE = /^[a-zA-Z0-9-]{8,64}$/
 
+/** 客户端默认同步间隔（秒），与 launcher config.rs 的 unwrap_or(300) 保持一致。 */
+const DEFAULT_SYNC_INTERVAL_SECS = 300
+
+/** 离线判定下限（秒）：15 分钟。 */
+const MIN_OFFLINE_THRESHOLD_SECS = 900
+
+/**
+ * 离线判定阈值（秒）= max(3 × 同步间隔, 15 分钟)。
+ *
+ * 取 3 倍是为了容忍连续两次上报丢失（网络抖动 / launcher 重启），
+ * 避免在线客户端被误判离线而状态闪动。
+ */
+function offlineThresholdSecs(syncIntervalSecs) {
+  const iv = Number(syncIntervalSecs) > 0 ? Number(syncIntervalSecs) : DEFAULT_SYNC_INTERVAL_SECS
+  return Math.max(3 * iv, MIN_OFFLINE_THRESHOLD_SECS)
+}
+
+/**
+ * 判断一条客户端记录是否离线（超过阈值未上报）。
+ *
+ * 服务端是**权威判定方**：客户端上报时 offline 恒为 false（它正在上报），
+ * 该字段不能作为在线依据。lastSyncAt 缺失/损坏 → 视为离线（陈旧记录）。
+ */
+function isOffline(record, nowMs, thresholdSecs) {
+  const t = Date.parse((record && record.lastSyncAt) || '')
+  if (!Number.isFinite(t)) return true
+  return nowMs - t > thresholdSecs * 1000
+}
+
 /** 归一化旧版客户端记录：补新字段默认值，保证 /api/status 输出结构稳定。 */
 function normalizeClientRecord(c) {
   if (!c || typeof c !== 'object') return null
@@ -121,7 +150,48 @@ function createClientsStore({ clientsDir }) {
     fs.writeFileSync(path.join(clientsDir, record.clientId + '.json'), JSON.stringify(record, null, 2), 'utf8')
   }
 
-  return { listClients, saveClientRecord, normalizeClientRecord, buildClientRecord, CLIENT_ID_RE }
+  /**
+   * 删除一条客户端记录。返回是否真的删掉了（幂等：不存在返回 false）。
+   * clientId 必须先过 CLIENT_ID_RE，否则拒绝（防路径穿越）。
+   */
+  function deleteClient(clientId) {
+    const id = String(clientId || '').trim()
+    if (!CLIENT_ID_RE.test(id)) return false
+    try {
+      fs.unlinkSync(path.join(clientsDir, id + '.json'))
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** 批量删除（逐个校验 id），返回实际删除条数。 */
+  function deleteClients(clientIds) {
+    let n = 0
+    for (const id of Array.isArray(clientIds) ? clientIds : []) {
+      if (deleteClient(id)) n++
+    }
+    return n
+  }
+
+  return {
+    listClients,
+    saveClientRecord,
+    deleteClient,
+    deleteClients,
+    normalizeClientRecord,
+    buildClientRecord,
+    CLIENT_ID_RE,
+  }
 }
 
-module.exports = { createClientsStore, normalizeClientRecord, buildClientRecord, CLIENT_ID_RE }
+module.exports = {
+  createClientsStore,
+  normalizeClientRecord,
+  buildClientRecord,
+  offlineThresholdSecs,
+  isOffline,
+  CLIENT_ID_RE,
+  DEFAULT_SYNC_INTERVAL_SECS,
+  MIN_OFFLINE_THRESHOLD_SECS,
+}

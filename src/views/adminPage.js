@@ -180,8 +180,12 @@ function adminPageHtml() {
   .client .cbody{padding:14px 16px}
   .client .sec{font-size:11.5px;color:var(--faint);font-weight:600;letter-spacing:.03em;margin:12px 0 6px;text-transform:uppercase}
   .client .sec:first-child{margin-top:0}
-  .client .foot{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;
+  .client .foot{display:flex;align-items:center;gap:10px;padding:10px 16px;
     background:#fafbfd;border-top:1px solid var(--line2);font-size:12px;color:var(--muted)}
+  .client .foot > span:last-of-type{margin-left:auto} /* 时间靠右，删除按钮贴最右 */
+  /* 客户端页工具栏（总数/在线/离线 + 批量清理） */
+  .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .toolbar > span{margin-right:auto}
 
   /* ── 口令弹窗 ── */
   .mask{position:fixed;inset:0;background:rgba(15,23,42,.42);z-index:50;display:none;align-items:center;justify-content:center}
@@ -398,6 +402,7 @@ function adminPageHtml() {
 
   <!-- 客户端 -->
   <section id="view-clients" class="view">
+    <div class="toolbar" id="clientsToolbar"></div>
     <div class="client-grid" id="clientGrid"></div>
   </section>
 </main>

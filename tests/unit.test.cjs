@@ -13,7 +13,13 @@ const path = require('node:path')
 
 const v = require('../src/validate')
 const { createConfigStore, defaultConfig, normalizeConfig } = require('../src/store/config')
-const { createClientsStore, normalizeClientRecord, buildClientRecord } = require('../src/store/clients')
+const {
+  createClientsStore,
+  normalizeClientRecord,
+  buildClientRecord,
+  offlineThresholdSecs,
+  isOffline,
+} = require('../src/store/clients')
 const { createMirrorPackagesStore } = require('../src/store/mirrorPackages')
 const { createLauncherReleasesStore } = require('../src/store/launcherReleases')
 const { createRouter } = require('../src/router')
@@ -128,6 +134,34 @@ eq('buildClientRecord 截断 plugins', rec.plugins.length, 1)
 eq('buildClientRecord 默认 bridgeStatus', rec.bridgeStatus, { enabled: false, port: 0 })
 check('normalizeClientRecord null', normalizeClientRecord(null) === null)
 eq('normalizeClientRecord 补字段', normalizeClientRecord({}).menuApplied, false)
+
+// ---------- 离线判定（服务端权威计算） ----------
+// 阈值 = max(3 × 同步间隔, 15 分钟)
+eq('阈值 默认300s→900s(下限生效)', offlineThresholdSecs(300), 900)
+eq('阈值 未传→默认', offlineThresholdSecs(undefined), 900)
+eq('阈值 600s→1800s(3倍生效)', offlineThresholdSecs(600), 1800)
+eq('阈值 非法值→默认', offlineThresholdSecs(0), 900)
+const NOW = Date.parse('2026-09-18T10:00:00.000Z')
+const at = (secAgo) => ({ lastSyncAt: new Date(NOW - secAgo * 1000).toISOString() })
+check('离线 刚上报→在线', !isOffline(at(10), NOW, 900))
+check('离线 899s→在线', !isOffline(at(899), NOW, 900))
+check('离线 901s→离线', isOffline(at(901), NOW, 900))
+check('离线 lastSyncAt缺失→离线', isOffline({}, NOW, 900))
+check('离线 lastSyncAt损坏→离线', isOffline({ lastSyncAt: 'garbage' }, NOW, 900))
+check('离线 null记录→离线', isOffline(null, NOW, 900))
+
+// ---------- 客户端删除（幂等 + 防穿越） ----------
+check('删除 不存在→false', !clStore.deleteClient('no-such-client-0001'))
+check('删除 非法id→false', !clStore.deleteClient('../../etc/passwd'))
+check('删除 穿越不越界', fs.existsSync(path.join(clientsDir, 'client-abcdefgh.json')))
+check('删除 存在→true', clStore.deleteClient('client-abcdefgh'))
+eq('删除 后目录为空', clStore.listClients().length, 0)
+check('删除 重复删→false(幂等)', !clStore.deleteClient('client-abcdefgh'))
+clStore.saveClientRecord({ clientId: 'bulk-a-00000001', hostname: 'A' })
+clStore.saveClientRecord({ clientId: 'bulk-b-00000002', hostname: 'B' })
+eq('批量删除 2 条', clStore.deleteClients(['bulk-a-00000001', 'bulk-b-00000002']), 2)
+eq('批量删除 后为空', clStore.listClients().length, 0)
+eq('批量删除 跳过非法id', clStore.deleteClients(['../../etc/passwd', 'nope-00000000001']), 0)
 
 // ---------- store: mirrorPackages ----------
 const mpPath = path.join(tmp, 'mirror-packages.json')

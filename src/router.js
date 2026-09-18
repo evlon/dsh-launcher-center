@@ -30,7 +30,7 @@ function createRouter(routeModules) {
   async function handle(ctx, req, res) {
     // CORS（管理页与客户端可能跨源）
     res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Admin-Token, X-Notes')
     if (req.method === 'OPTIONS') {
       res.writeHead(204)

@@ -131,7 +131,7 @@ async function loadStatus(){
       return;
     }
     latestClients=j.clients||[];
-    renderKpis(); renderOverviewClients(); renderClients();
+    renderKpis(); renderOverviewClients(); renderClientsToolbar(); renderClients();
     autoDetectBridge();
     // 恢复镜像上传进度轮询：若本机管理能力已连接且上传可能在进行（上次停在了 running），
     // 页面刷新/加载后继续显示进度，而不是停留在旧状态（插件页 + npm 同步页各自恢复）

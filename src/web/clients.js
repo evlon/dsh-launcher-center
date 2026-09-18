@@ -5,12 +5,44 @@
  */
 
 // ── 客户端 ──
+// offline 由服务端按 lastSyncAt 计算（客户端上报的 offline 恒为 false，不可信）
 function healthOf(c){
   if(c.offline) return {k:"bad",txt:"离线",dot:"bad"};
   if((c.pending||[]).length>0) return {k:"warn",txt:"缺插件",dot:"warn"};
   const pe=!!(current.managedMenu&&current.managedMenu.enabled);
   if(pe&&!c.menuApplied) return {k:"warn",txt:"菜单未应用",dot:"warn"};
   return {k:"ok",txt:"正常",dot:"ok"};
+}
+// 删除客户端记录（服务端 DELETE /api/clients）
+async function removeClient(clientId,hostname){
+  if(!confirm("确定删除客户端记录？\n\n"+(hostname||"未命名")+"\n"+clientId+
+    "\n\n若该机器仍在线，下次同步（几分钟内）会自动重新出现。")) return;
+  try{
+    const r=await fetch("/api/clients",{method:"DELETE",headers:headers(true),
+      body:JSON.stringify({clientId})});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===403){ showLoginGate(); return; }
+    if(!r.ok){ toast("删除失败："+((j&&j.error)||("HTTP "+r.status)),"bad"); return; }
+    if(j.deleted>0){ toast("已删除 "+(hostname||clientId),"ok"); loadStatus(); }
+    else toast("记录不存在（可能已被清理）","warn");
+  }catch(e){ toast("删除失败："+e.message,"bad"); }
+}
+// 批量清理全部离线客户端（服务端按同一阈值判定 offline）
+async function purgeOfflineClients(){
+  const off=latestClients.filter(c=>c.offline);
+  if(!off.length){ toast("当前没有离线客户端","warn"); return; }
+  const names=off.slice(0,8).map(c=>"· "+(c.hostname||c.clientId.slice(0,8))).join("\n");
+  if(!confirm("确定清理全部离线客户端？共 "+off.length+" 台\n\n"+names+
+    (off.length>8?"\n… 等 "+(off.length-8)+" 台":"")+
+    "\n\n若某台机器只是暂时关机，重新开机同步后会再次出现。")) return;
+  try{
+    const r=await fetch("/api/clients",{method:"DELETE",headers:headers(true),
+      body:JSON.stringify({offline:true})});
+    const j=await r.json().catch(()=>({}));
+    if(r.status===403){ showLoginGate(); return; }
+    if(!r.ok){ toast("清理失败："+((j&&j.error)||("HTTP "+r.status)),"bad"); return; }
+    toast("已清理 "+j.deleted+" 台离线客户端","ok"); loadStatus();
+  }catch(e){ toast("清理失败："+e.message,"bad"); }
 }
 function chipPlugins(list){
   if(!list||!list.length) return '<span class="chip dim">未上报</span>';
@@ -65,8 +97,20 @@ function renderClients(){
       +'<div class="sec">Profile</div><div class="chips">'+profs+'</div>'
       +'</div>'
       +'<div class="foot"><span>'+applied+'</span>'
-      +'<span title="'+esc(c.lastSyncAt||"")+'">'+fmtTime(c.lastSyncAt)+'</span></div>'
+      +'<span title="'+esc(c.lastSyncAt||"")+'">'+fmtTime(c.lastSyncAt)+'</span>'
+      +'<button class="btn danger sm" title="删除此客户端记录" onclick="removeClient(\''+esc(c.clientId||"")+'\',\''+esc(c.hostname||"")+'\')">删除</button>'
+      +'</div>'
       +'</div>';
   }).join("");
+}
+// 渲染客户端页工具栏（离线数量 + 批量清理按钮）
+function renderClientsToolbar(){
+  const el=document.getElementById("clientsToolbar");
+  if(!el) return;
+  const off=latestClients.filter(c=>c.offline).length;
+  const on=latestClients.length-off;
+  el.innerHTML='<span style="color:var(--muted);font-size:12.5px">共 '+latestClients.length+' 台 · 在线 '+on+' · 离线 '+off+'</span>'
+    +'<button class="btn" onclick="loadStatus()">刷新</button>'
+    +(off>0?'<button class="btn danger" onclick="purgeOfflineClients()">清理离线（'+off+'）</button>':'');
 }
 
