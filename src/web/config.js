@@ -15,7 +15,7 @@ async function loadConfig(){
     current=j; current.managedMenu=current.managedMenu||{enabled:false,quickLinks:[]};
     current.clientDefaults=current.clientDefaults||{};
     renderPlugins(); renderMenuPolicy(); renderClientDefaults();
-    loadMirrorPackages();
+    loadMirrorPackages(); loadEnvDefaults();
   }catch(e){ toast("加载配置失败："+esc(e.message),"err"); }
 }
 function renderClientDefaults(){
@@ -58,6 +58,123 @@ async function saveClientDefaults(){
     if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
     current=j; current.clientDefaults=current.clientDefaults||{};
     renderClientDefaults(); toast("客户端默认配置已保存","ok");
+  }catch(e){ toast("保存失败："+esc(e.message),"err"); }
+}
+
+// ── 环境默认配置（envDefaults）：{ "<namespace>": { "<key>": "<值>" } } ──
+// 工作副本 envDraft：命名空间不可改名（需改名请删除重建），键值可直接编辑。
+let envDraft = {};
+function loadEnvDefaults(){
+  envDraft = {};
+  const ed = current.envDefaults || {};
+  for (const ns of Object.keys(ed)) {
+    envDraft[ns] = {};
+    for (const k of Object.keys(ed[ns] || {})) {
+      const v = ed[ns][k];
+      // 值只接受字符串/数字/布尔（服务端校验），统一按字符串展示
+      envDraft[ns][k] = (typeof v === "boolean" || typeof v === "number") ? String(v) : String(v ?? "");
+    }
+  }
+  renderEnvDefaults();
+}
+function renderEnvDefaults(){
+  const el = document.getElementById("envDefaultsList");
+  const nss = Object.keys(envDraft);
+  if (!nss.length) {
+    el.innerHTML = '<div class="empty">暂无环境默认配置 —— 点上方「＋ 添加命名空间」开始</div>';
+    return;
+  }
+  el.innerHTML = nss.map((ns) => {
+    const keys = Object.keys(envDraft[ns]);
+    const rows = keys.map((k) =>
+      '<div class="env-row">'
+      + '<input class="input key" value="'+esc(k)+'" onchange="editEnvKey(\''+escJs(ns)+'\','+keys.indexOf(k)+',this.value)" placeholder="键名">'
+      + '<input class="input val" value="'+esc(envDraft[ns][k])+'" onchange="editEnvVal(\''+escJs(ns)+'\','+keys.indexOf(k)+',this.value)" placeholder="值（如 https://auth.ict.cmcc/realms/employees）">'
+      + '<button class="btn sm danger" onclick="removeEnvKey(\''+escJs(ns)+'\','+keys.indexOf(k)+')" title="删除此键">✕</button>'
+      + '</div>'
+    ).join("");
+    return '<div class="env-card">'
+      + '<div class="env-head"><span class="ns">'+esc(ns)+'</span>'
+      + '<button class="btn sm ghost" onclick="addEnvKey(\''+escJs(ns)+'\')" title="添加键">＋ 键</button>'
+      + '<button class="btn sm danger" onclick="removeEnvNamespace(\''+escJs(ns)+'\')" title="删除整个命名空间">✕</button></div>'
+      + '<div class="env-body">' + (rows || '<div class="env-empty">无键 —— 点「＋ 键」添加</div>') + '</div>'
+      + '</div>';
+  }).join("");
+}
+// 唯一引号安全序列化（用于内联 onclick 参数）
+function escJs(s){ return String(s).replace(/\\/g,"\\\\").replace(/'/g,"\\'"); }
+function addEnvNamespace(){
+  const v = document.getElementById("newEnvNs").value.trim();
+  if (!v) { toast("命名空间不能为空","warn"); return; }
+  if (!/^[A-Za-z0-9_-]+$/.test(v)) { toast("命名空间限字母数字-_(如 matrix-activation)","warn"); return; }
+  if (envDraft[v]) { toast("命名空间 "+esc(v)+" 已存在","warn"); return; }
+  envDraft[v] = {};
+  document.getElementById("newEnvNs").value = "";
+  renderEnvDefaults();
+}
+function removeEnvNamespace(ns){
+  delete envDraft[ns];
+  renderEnvDefaults();
+}
+function addEnvKey(ns){
+  // 追加一个空键行（自动生成未占用键名）
+  const keys = Object.keys(envDraft[ns]);
+  let k = "key" + (keys.length || "");
+  let n = 1;
+  while (envDraft[ns][k] !== undefined) { k = "key" + (keys.length + n); n++; }
+  envDraft[ns][k] = "";
+  renderEnvDefaults();
+}
+function removeEnvKey(ns, idx){
+  const keys = Object.keys(envDraft[ns]);
+  delete envDraft[ns][keys[idx]];
+  renderEnvDefaults();
+}
+function editEnvKey(ns, idx, v){
+  const keys = Object.keys(envDraft[ns]);
+  const old = keys[idx];
+  if (v === old) return;
+  if (!/^[A-Za-z0-9_-]+$/.test(v)) { toast("键名限字母数字-_","warn"); renderEnvDefaults(); return; }
+  if (envDraft[ns][v] !== undefined && v !== old) { toast("键已存在","warn"); renderEnvDefaults(); return; }
+  const val = envDraft[ns][old];
+  const newKeys = keys.slice(); newKeys[idx] = v;
+  delete envDraft[ns][old];
+  envDraft[ns][v] = val;
+  // 保持原有顺序
+  const reordered = {};
+  for (const k of newKeys) reordered[k] = envDraft[ns][k];
+  envDraft[ns] = reordered;
+  renderEnvDefaults();
+}
+function editEnvVal(ns, idx, v){
+  const keys = Object.keys(envDraft[ns]);
+  envDraft[ns][keys[idx]] = v;
+}
+async function saveEnvDefaults(){
+  // 清洗：去掉空键行；空值保留（表示"下发空串"）但可被下方过滤
+  const cleaned = {};
+  for (const ns of Object.keys(envDraft)) {
+    const row = {};
+    for (const k of Object.keys(envDraft[ns])) {
+      if (!k.trim()) continue;                        // 跳过空键名
+      const val = (envDraft[ns][k] || "").trim();
+      if (val === "") continue;                        // 跳过空值（避免持久化空串破坏幂等）
+      row[k] = val;
+    }
+    if (Object.keys(row).length) cleaned[ns] = row;
+  }
+  try{
+    const body = {
+      plugins: current.plugins || [],
+      managedMenu: current.managedMenu,
+      clientDefaults: current.clientDefaults || {},
+      envDefaults: cleaned,
+    };
+    const r = await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
+    const j = await r.json();
+    if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
+    current = j; current.envDefaults = current.envDefaults || {};
+    loadEnvDefaults(); toast("环境默认配置已保存","ok");
   }catch(e){ toast("保存失败："+esc(e.message),"err"); }
 }
 

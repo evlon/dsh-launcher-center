@@ -77,6 +77,11 @@ function adminPageHtml() {
   .btn:hover{border-color:#cdd4e4;background:#fafbfe}
   .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
   .btn.primary:hover{background:#2f55d8;border-color:#2f55d8}
+  /* 本机管理能力连接按钮状态：已连接（绿）／未授权（黄） */
+  .btn.ok{background:var(--green);border-color:var(--green);color:#fff}
+  .btn.ok:hover{background:#12833e;border-color:#12833e}
+  .btn.warn{background:var(--amber);border-color:var(--amber);color:#fff}
+  .btn.warn:hover{background:#b45f06;border-color:#b45f06}
   .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
   .btn.ghost:hover{color:var(--text);background:#f2f4f9}
   .btn.sm{padding:5px 10px;font-size:12.5px;border-radius:7px}
@@ -167,6 +172,17 @@ function adminPageHtml() {
     background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
   .switch input:checked + .sl{background:var(--primary)}
   .switch input:checked + .sl:before{transform:translateX(18px)}
+
+  /* ── envDefaults 编辑器 ── */
+  .env-card{border:1px solid var(--line2);border-radius:10px;margin-bottom:10px;background:#fbfcfe;overflow:hidden}
+  .env-card .env-head{display:flex;align-items:center;gap:8px;padding:10px 14px;background:#f4f6fb;
+    border-bottom:1px solid var(--line2);font-weight:650;font-size:13.5px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+  .env-card .env-head .ns{margin-right:auto}
+  .env-card .env-body{padding:10px 14px}
+  .env-row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+  .env-row .input.key{flex:0 0 240px;font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+  .env-row .input.val{flex:1}
+  .env-empty{color:var(--faint);font-size:13px;padding:6px 2px}
 
   /* ── 客户端卡片 ── */
   .client-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
@@ -325,6 +341,18 @@ function adminPageHtml() {
         <input class="input" id="cdDshRegistry" placeholder="dsh 安装内网源（如 http://registry.ict.cmcc；空=不下发）" style="flex:1">
       </div>
       <div style="margin-top:12px"><button class="btn primary" onclick="saveClientDefaults()">保存客户端默认配置</button></div>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div><h2 class="card-title">环境默认配置（envDefaults）</h2>
+        <div class="card-desc">给各插件的「统一环境地址」设默认值，客户端同步时写入其 <code>settings.yaml</code>（环境地址类键强制覆盖旧值）。例如数字分身激活 identity 提供商：<code>matrix-activation → keycloakIssuer</code>。改动保存后，客户端下次轮询（默认 5 分钟）生效</div></div>
+      </div>
+      <div class="row" style="margin-bottom:12px;max-width:520px">
+        <input class="input" id="newEnvNs" placeholder="命名空间，如 matrix-activation" onkeydown="if(event.key==='Enter')addEnvNamespace()">
+        <button class="btn" onclick="addEnvNamespace()">＋ 添加命名空间</button>
+      </div>
+      <div id="envDefaultsList"></div>
+      <div style="margin-top:14px"><button class="btn primary" onclick="saveEnvDefaults()">保存环境默认配置</button></div>
     </div>
   </section>
 

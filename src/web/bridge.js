@@ -200,6 +200,7 @@ async function autoDetectBridge(){
             }catch(e){ authed=false; /* 探测超时/失败：保守按未授权处理 */ }
           }
           localStorage.setItem("bridgeAuthed",authed?"1":"0");
+          updateBridgeButton(authed?"connected":"unauthorized");
           st.innerHTML = authed
             ? '<span style="color:var(--green)">✓ 已连接本机管理能力（端口 '+port+'，v'+esc(j.version||"?")+'）</span>'
             : '<span style="color:var(--amber)">⚠ 已连接端口 '+port+' 但 token 未授权——请填入托盘显示的管理 token</span>';
@@ -214,12 +215,30 @@ async function autoDetectBridge(){
   // 全部失败：清理可能残留的假连接状态，明确显示未连接
   if(bridgePort){ bridgePort=null; localStorage.removeItem("bridgePort"); }
   bridgeVersion="";
+  updateBridgeButton("disconnected");
   st.innerHTML='<span style="color:var(--muted)">本机管理能力未连接——同步/上传需管理员在本机 launcher 托盘「管理能力」开启</span>';
+}
+// 按钮状态：连接中 ⏳ / 已连接 ✓（绿色）/ 已连接未授权 ⚠ / 未连接「连接」。让按钮实时反映状态。
+function updateBridgeButton(state){
+  const btn=document.getElementById("bridgeBtn");
+  if(!btn) return;
+  // 清掉旧状态 class，恢复基础样式
+  btn.classList.remove("ok","warn");
+  if(state==="connecting"){
+    btn.textContent="连接中…"; btn.disabled=true;
+  }else if(state==="connected"){
+    btn.textContent="✓ 已连接"; btn.disabled=false; btn.classList.add("ok");
+  }else if(state==="unauthorized"){
+    btn.textContent="⚠ 未授权"; btn.disabled=false; btn.classList.add("warn");
+  }else{ // disconnected
+    btn.textContent="连接"; btn.disabled=false;
+  }
 }
 async function setBridgePort(){
   const v=document.getElementById("bridgePortInput").value.trim();
   const p=parseInt(v,10);
   if(!p||p<1||p>65535){ toast("端口无效","warn"); return; }
+  document.getElementById("bridgeBtn") && updateBridgeButton("connecting");
   // 验证该端口确实是本机管理能力（带超时）
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),3000);
@@ -227,9 +246,9 @@ async function setBridgePort(){
     const r=await fetch("http://127.0.0.1:"+p+"/api/health",{headers:headers(false),signal:ctrl.signal});
     clearTimeout(timer);
     const j=await r.json();
-    if(!r.ok||!j||!j.ok){ toast("该端口不是有效的管理能力服务","warn"); return; }
+    if(!r.ok||!j||!j.ok){ updateBridgeButton("disconnected"); toast("该端口不是有效的管理能力服务","warn"); return; }
     bridgeVersion=(j.version||"").replace(/^v/,"");
-  }catch(e){ clearTimeout(timer); toast("无法连接该端口（本机管理能力未开启？）","warn"); return; }
+  }catch(e){ clearTimeout(timer); updateBridgeButton("disconnected"); toast("无法连接该端口（本机管理能力未开启？）","warn"); return; }
   bridgePort=p;
   localStorage.setItem("bridgePort",String(p));
   // 保存连接 token（无条件写，空则清除旧值）
@@ -250,6 +269,7 @@ async function setBridgePort(){
     }catch(e){ authed=false; }
   }
   localStorage.setItem("bridgeAuthed",authed?"1":"0");
+  updateBridgeButton(authed?"connected":"unauthorized");
   if(st){
     st.innerHTML = authed
       ? '<span style="color:var(--green)">✓ 已连接本机管理能力（端口 '+p+'，v'+esc(bridgeVersion||"?")+'）</span>'
