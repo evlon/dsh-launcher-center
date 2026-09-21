@@ -63,10 +63,36 @@ function normalizeClientRecord(c) {
       c.bridgeStatus && typeof c.bridgeStatus === 'object'
         ? { enabled: !!c.bridgeStatus.enabled, port: Number(c.bridgeStatus.port) || 0 }
         : { enabled: false, port: 0 },
+    // 员工身份：老客户端（< 0.4.2）不上报此字段 → 归一化为空身份
+    identity: normalizeIdentity(c.identity),
     offline: !!c.offline,
     lastSyncAt: c.lastSyncAt || '',
   }
 }
+
+/**
+ * 归一化员工身份（`identity`）。
+ *
+ * 中心服务端是**记录者**：身份由客户端在同步时上报（来源是 Keycloak SSO 登录
+ * 写入本机 settings.yaml 的 username/displayName），服务端不主动查任何身份系统。
+ * 老客户端不上报该字段，一律得到空串——管理页据此显示「未登录」。
+ */
+function normalizeIdentity(id) {
+  const o = id && typeof id === 'object' ? id : {}
+  return {
+    username: String(o.username || '').slice(0, 128),
+    displayName: String(o.displayName || '').slice(0, 128),
+    owner: String(o.owner || '').slice(0, 256),
+    twinUserId: String(o.twinUserId || '').slice(0, 256),
+  }
+}
+
+/** 身份是否为空（管理页显示「未登录」）。 */
+function isIdentityEmpty(id) {
+  const o = normalizeIdentity(id)
+  return !o.username && !o.displayName && !o.owner && !o.twinUserId
+}
+
 
 /**
  * 把客户端上报的原始 body 规整成待落盘记录（字段截断，防超长/注入）。
@@ -117,6 +143,9 @@ function buildClientRecord(body) {
       enabled: !!(body.bridgeStatus && body.bridgeStatus.enabled),
       port: Number((body.bridgeStatus && body.bridgeStatus.port) || 0) || 0,
     },
+    // 员工身份（管理页「谁在用这台机器」）。
+    // ⚠️ 纯展示：服务端只用它显示，绝不用它做鉴权判定。
+    identity: normalizeIdentity(body.identity),
     offline: !!body.offline,
     lastSyncAt: new Date().toISOString(),
   }
@@ -189,6 +218,8 @@ module.exports = {
   createClientsStore,
   normalizeClientRecord,
   buildClientRecord,
+  normalizeIdentity,
+  isIdentityEmpty,
   offlineThresholdSecs,
   isOffline,
   CLIENT_ID_RE,

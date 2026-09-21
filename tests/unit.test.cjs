@@ -17,6 +17,8 @@ const {
   createClientsStore,
   normalizeClientRecord,
   buildClientRecord,
+  normalizeIdentity,
+  isIdentityEmpty,
   offlineThresholdSecs,
   isOffline,
 } = require('../src/store/clients')
@@ -134,6 +136,39 @@ eq('buildClientRecord 截断 plugins', rec.plugins.length, 1)
 eq('buildClientRecord 默认 bridgeStatus', rec.bridgeStatus, { enabled: false, port: 0 })
 check('normalizeClientRecord null', normalizeClientRecord(null) === null)
 eq('normalizeClientRecord 补字段', normalizeClientRecord({}).menuApplied, false)
+
+// ---------- 员工身份（管理页「谁在用这台机器」） ----------
+// 老客户端（< 0.4.2）不上报 identity → 必须归一化为空身份，不能让 UI 崩或显示 undefined
+eq('identity 缺失→空身份', normalizeClientRecord({}).identity, {
+  username: '',
+  displayName: '',
+  owner: '',
+  twinUserId: '',
+})
+eq('identity 非对象→空身份', normalizeClientRecord({ identity: 'nope' }).identity, {
+  username: '',
+  displayName: '',
+  owner: '',
+  twinUserId: '',
+})
+eq('identity 全空→isIdentityEmpty', isIdentityEmpty({}), true)
+eq('identity 有姓名→非空', isIdentityEmpty({ displayName: '牛昆亮' }), false)
+eq('identity 只有 owner→非空', isIdentityEmpty({ owner: '@niukunliang:im.ai.ict.cmcc' }), false)
+// 落盘记录保留身份
+const idRec = buildClientRecord({
+  clientId: 'client-with-id',
+  identity: { username: 'niukunliang', displayName: '牛昆亮', owner: '@niukunliang:x', twinUserId: '@ai-niukunliang:x' },
+})
+eq('buildClientRecord 保留身份', idRec.identity.displayName, '牛昆亮')
+eq('buildClientRecord 保留 twinUserId', idRec.identity.twinUserId, '@ai-niukunliang:x')
+// 超长字段被截断（防注入/防超长）
+const longRec = buildClientRecord({ clientId: 'c2', identity: { displayName: 'x'.repeat(500) } })
+check('identity displayName 截断到 128', longRec.identity.displayName.length === 128)
+// 数字/对象等非法类型 → 字符串化后截断，不抛错
+const weirdRec = buildClientRecord({ clientId: 'c3', identity: { username: 12345 } })
+eq('identity 数字→字符串', weirdRec.identity.username, '12345')
+// normalizeClientRecord 对已存盘记录同样补 identity（老记录升级路径）
+eq('老记录补 identity', normalizeClientRecord({ clientId: 'old' }).identity.displayName, '')
 
 // ---------- 离线判定（服务端权威计算） ----------
 // 阈值 = max(3 × 同步间隔, 15 分钟)

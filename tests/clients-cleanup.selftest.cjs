@@ -203,7 +203,40 @@ function writeRawRecord(clientId, lastSyncAt, hostname) {
     eq('再次上报 → 记录重建', back.json.clients.length, 1)
     check('重建后为在线', back.json.clients[0].offline === false)
 
-    // ── ⑩ 恢复配置（避免污染后续断言）──
+    // ── ⑩ 员工身份：上报 → /api/status 原样返回（管理页数据源）──
+    const idSync = await req('POST', '/api/sync', {
+      body: JSON.stringify({
+        clientId: 'ident-client-00010',
+        hostname: 'IDHOST',
+        identity: {
+          username: 'niukunliang',
+          displayName: '牛昆亮',
+          owner: '@niukunliang:im.ai.ict.cmcc',
+          twinUserId: '@ai-niukunliang:im.ai.ict.cmcc',
+        },
+      }),
+    })
+    eq('带身份上报 → 200', idSync.status, 200)
+    const idStatus = await req('GET', '/api/status', { headers: AUTH })
+    const idRec = idStatus.json.clients.find((c) => c.clientId === 'ident-client-00010')
+    check('身份记录存在', !!idRec)
+    eq('身份 displayName 保留', idRec.identity.displayName, '牛昆亮')
+    eq('身份 username 保留', idRec.identity.username, 'niukunliang')
+    eq('身份 owner 保留', idRec.identity.owner, '@niukunliang:im.ai.ict.cmcc')
+    eq('身份 twinUserId 保留', idRec.identity.twinUserId, '@ai-niukunliang:im.ai.ict.cmcc')
+
+    // 老客户端（不上报 identity）→ 归一化为空身份，结构稳定不崩
+    const legacy = await req('POST', '/api/sync', { body: JSON.stringify({ clientId: 'legacy-client-00011', hostname: 'OLD' }) })
+    eq('无身份上报 → 200', legacy.status, 200)
+    const legStatus = await req('GET', '/api/status', { headers: AUTH })
+    const legRec = legStatus.json.clients.find((c) => c.clientId === 'legacy-client-00011')
+    eq('老客户端 identity 归一化为空', legRec.identity, { username: '', displayName: '', owner: '', twinUserId: '' })
+
+    // 落盘文件确实含 identity（重启服务端后仍在，不是内存态）
+    const onDisk = JSON.parse(fs.readFileSync(path.join(DATA, 'clients', 'ident-client-00010.json'), 'utf8'))
+    eq('身份已落盘', onDisk.identity.displayName, '牛昆亮')
+
+    // ── ⑪ 恢复配置（避免污染后续断言）──
     await req('POST', '/api/config', { body: JSON.stringify({ clientDefaults: { syncIntervalSecs: 300 } }), headers: AUTH })
   } finally {
     cleanup()
