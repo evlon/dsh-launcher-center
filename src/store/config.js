@@ -23,6 +23,8 @@ const fs = require('node:fs')
  *                    - 环境地址类键（认证域名/服务地址等）→ 服务端有值就【强制覆盖】纠正存量旧值；
  *                    - 其余键（个人凭据等）→ 遵循「只填空缺」，用户已设的不覆盖。
  *                  管理员改一处，全员生效（客户端下次同步时应用）。
+ *   jobPresets     预装岗位清单（字符串数组）：新用户激活数字人后，himarket 插件
+ *                  按这些岗位名自动下载并落盘到 .agent-presets/，即装即用。
  */
 function defaultConfig() {
   return {
@@ -33,6 +35,7 @@ function defaultConfig() {
     clientDefaults: {},
     mirrorSettings: { registry: 'http://registry.ict.cmcc', tokenValue: '' },
     envDefaults: {},
+    jobPresets: [],
     updatedAt: new Date().toISOString(),
     baseUrl: '',
   }
@@ -56,6 +59,7 @@ function normalizeConfig(cfg) {
     if (typeof cfg.envDefaults !== 'object' || cfg.envDefaults === null) {
       cfg.envDefaults = {}
     }
+    if (!Array.isArray(cfg.jobPresets)) cfg.jobPresets = []
     if (typeof cfg.plugins !== 'object' || !Array.isArray(cfg.plugins)) cfg.plugins = []
     if (typeof cfg.profilePlugins !== 'object' || cfg.profilePlugins === null || Array.isArray(cfg.profilePlugins)) {
       cfg.profilePlugins = {}

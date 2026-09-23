@@ -90,6 +90,29 @@ function check(name, cond, detail) {
   r = await req('POST', '/api/config', JSON.stringify({ envDefaults: { x: { y: 'z' } } }))
   check('6. 无 token 写入被拒 403', r.status === 403, `status=${r.status}`)
 
+  // 6b. jobPresets 合法写入（字符串数组，去重保序）
+  r = await req('POST', '/api/config', JSON.stringify({ jobPresets: ['pm', 'dev', 'pm', 'qa'] }), { 'X-Admin-Token': TOKEN })
+  check('6b1. 合法 jobPresets 写入返回 200', r.status === 200, `status=${r.status} body=${r.body.slice(0, 200)}`)
+  r = await req('GET', '/api/config')
+  try {
+    cfg = JSON.parse(r.body)
+  } catch {}
+  check('6b2. 读回 jobPresets 去重保序', Array.isArray(cfg.jobPresets) && JSON.stringify(cfg.jobPresets) === JSON.stringify(['pm', 'dev', 'qa']), JSON.stringify(cfg.jobPresets))
+
+  // 6c. jobPresets 非法元素应被拒（非字符串 / 非法字符）
+  r = await req('POST', '/api/config', JSON.stringify({ jobPresets: [123] }), { 'X-Admin-Token': TOKEN })
+  check('6c1. jobPresets 非字符串元素被拒 400', r.status === 400, `status=${r.status}`)
+  r = await req('POST', '/api/config', JSON.stringify({ jobPresets: ['bad name!'] }), { 'X-Admin-Token': TOKEN })
+  check('6c2. jobPresets 非法字符被拒 400', r.status === 400, `status=${r.status}`)
+
+  // 6d. jobPresets 传非数组应被拒
+  r = await req('POST', '/api/config', JSON.stringify({ jobPresets: 'pm' }), { 'X-Admin-Token': TOKEN })
+  check('6d. jobPresets 非数组被拒 400', r.status === 400, `status=${r.status}`)
+
+  // 6e. jobPresets 空数组合法（清空清单）
+  r = await req('POST', '/api/config', JSON.stringify({ jobPresets: [] }), { 'X-Admin-Token': TOKEN })
+  check('6e. jobPresets 空数组合法 200', r.status === 200, `status=${r.status}`)
+
   // 7. X-Notes 中文经 latin1 到达后应能正确还原（decodeHeaderUtf8）
   //    模拟客户端：按 UTF-8 发字节
   const notesRaw = 'v0.3.7: 修复浏览器 401 抓取令牌'

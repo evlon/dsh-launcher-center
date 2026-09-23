@@ -14,6 +14,7 @@ const {
   validateManagedMenu,
   validateProfilePlugins,
   validateEnvDefaults,
+  validateJobPresets,
   normalizeStringList,
 } = require('../validate')
 const { send, readBody } = require('../http')
@@ -117,6 +118,13 @@ async function updateConfig(ctx, req, res) {
     const ed = validateEnvDefaults(body.envDefaults)
     if (!ed.ok) return send(res, 400, { error: ed.error })
     cfg.envDefaults = ed.cleaned
+  }
+
+  // 预装岗位清单（jobPresets）：字符串数组，新用户激活数字人后 himarket 自动落盘。
+  if (body.jobPresets !== undefined) {
+    const jp = validateJobPresets(body.jobPresets)
+    if (!jp.ok) return send(res, 400, { error: jp.error })
+    cfg.jobPresets = jp.cleaned
   }
 
   // 镜像上传设置（mirrorSettings）：registry 合法 URL + tokenValue（发布凭证，存服务端）

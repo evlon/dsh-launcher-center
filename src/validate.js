@@ -134,6 +134,30 @@ function normalizeStringList(v) {
   return undefined // 非法类型
 }
 
+/**
+ * 校验预装岗位清单（jobPresets）：字符串数组，元素为岗位技能名（HiMarket market-skills
+ * 里的 name，供 himarket 插件按名找 productId 下载落盘）。
+ * 元素限「字母数字-_」，去重保序；空数组合法（清空下发清单）。
+ */
+function validateJobPresets(v) {
+  if (v === undefined || v === null) return { ok: true, cleaned: [] }
+  if (!Array.isArray(v)) return { ok: false, error: 'jobPresets 必须是字符串数组' }
+  const out = []
+  const seen = new Set()
+  for (const item of v) {
+    if (typeof item !== 'string') return { ok: false, error: 'jobPresets 元素必须是字符串' }
+    const t = item.trim()
+    if (t === '') continue
+    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(t)) {
+      return { ok: false, error: `jobPresets 元素「${t}」非法（限字母数字-_，≤64 字符）` }
+    }
+    if (seen.has(t)) continue
+    seen.add(t)
+    out.push(t)
+  }
+  return { ok: true, cleaned: out }
+}
+
 module.exports = {
   validPackageName,
   validMirrorSpec,
@@ -142,6 +166,7 @@ module.exports = {
   validateManagedMenu,
   validateProfilePlugins,
   validateEnvDefaults,
+  validateJobPresets,
   normalizeStringList,
   ENV_KEY_RE,
 }

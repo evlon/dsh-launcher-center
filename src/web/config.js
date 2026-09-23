@@ -15,7 +15,7 @@ async function loadConfig(){
     current=j; current.managedMenu=current.managedMenu||{enabled:false,quickLinks:[]};
     current.clientDefaults=current.clientDefaults||{};
     renderPlugins(); renderMenuPolicy(); renderClientDefaults();
-    loadMirrorPackages(); loadEnvDefaults();
+    loadMirrorPackages(); loadEnvDefaults(); renderJobPresets();
   }catch(e){ toast("加载配置失败："+esc(e.message),"err"); }
 }
 function renderClientDefaults(){
@@ -175,6 +175,32 @@ async function saveEnvDefaults(){
     if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
     current = j; current.envDefaults = current.envDefaults || {};
     loadEnvDefaults(); toast("环境默认配置已保存","ok");
+  }catch(e){ toast("保存失败："+esc(e.message),"err"); }
+}
+
+// ── 预装岗位（jobPresets）：字符串数组，新用户激活数字人后 himarket 自动落盘 ──
+function renderJobPresets(){
+  const el = document.getElementById("jobPresetsInput");
+  if (!el) return;
+  const jobs = Array.isArray(current.jobPresets) ? current.jobPresets : [];
+  el.value = jobs.join(", ");
+}
+async function saveJobPresets(){
+  const raw = document.getElementById("jobPresetsInput").value;
+  const jobs = raw.split(",").map(x => x.trim()).filter(Boolean);
+  try{
+    const body = {
+      plugins: current.plugins || [],
+      managedMenu: current.managedMenu,
+      clientDefaults: current.clientDefaults || {},
+      envDefaults: current.envDefaults || {},
+      jobPresets: jobs,
+    };
+    const r = await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
+    const j = await r.json();
+    if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
+    current = j; current.jobPresets = current.jobPresets || [];
+    renderJobPresets(); toast("预装岗位已保存","ok");
   }catch(e){ toast("保存失败："+esc(e.message),"err"); }
 }
 

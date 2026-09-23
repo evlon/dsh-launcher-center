@@ -354,6 +354,16 @@ function adminPageHtml() {
       <div id="envDefaultsList"></div>
       <div style="margin-top:14px"><button class="btn primary" onclick="saveEnvDefaults()">保存环境默认配置</button></div>
     </div>
+    <div class="card">
+      <div class="card-head">
+        <div><h2 class="card-title">预装岗位（jobPresets）</h2>
+        <div class="card-desc">新用户激活数字人后自动安装的岗位清单（HiMarket 岗位技能名，如 <code>pm</code> / <code>dev</code> / <code>secretary</code>）。客户端同步后，himarket 插件按名下载落盘到 <code>.agent-presets/</code>，即装即用。逗号分隔，留空=不下发。</div></div>
+      </div>
+      <div class="row" style="margin-bottom:12px;max-width:620px">
+        <input class="input" id="jobPresetsInput" placeholder="岗位技能名，逗号分隔，如 pm, dev, qa, secretary" style="flex:1" onkeydown="if(event.key==='Enter')saveJobPresets()">
+      </div>
+      <div style="margin-top:14px"><button class="btn primary" onclick="saveJobPresets()">保存预装岗位</button></div>
+    </div>
   </section>
 
   <!-- npm 包同步 -->
