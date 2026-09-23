@@ -28,6 +28,7 @@
  *   GET  /api/launcher/latest       launcher 最新发布元数据（免鉴权，同事端轮询）
  *   GET  /api/launcher/download     exe 下载（免鉴权，文件名白名单）
  *   POST /api/launcher/releases     上传 launcher 新版本（需 token）
+ *   PATCH /api/launcher/notes       只改最新发布物的更新说明（需 token，不重传 exe）
  *   GET  /                          302 → /admin
  *   GET  /admin                     管理控制台
  *   GET  /admin.js                  管理页脚本（每次读盘，改即生效）

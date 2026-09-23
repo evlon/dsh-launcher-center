@@ -179,28 +179,96 @@ async function saveEnvDefaults(){
 }
 
 // ── 预装岗位（jobPresets）：字符串数组，新用户激活数字人后 himarket 自动落盘 ──
+// 内置候选岗位清单（HiMarket 已发布的岗位技能名）。搜索框过滤 + chip 勾选；清单外岗位可手输追加。
+const BUILTIN_JOBS = [
+  { id: "pm",         label: "产品经理" },
+  { id: "pm-roster",  label: "产品经理·花名册" },
+  { id: "dev",        label: "研发工程师" },
+  { id: "dev-roster", label: "研发·花名册" },
+  { id: "qa",         label: "测试工程师" },
+  { id: "qa-roster",  label: "测试·花名册" },
+  { id: "leader",     label: "团队负责人" },
+  { id: "leader-roster", label: "负责人·花名册" },
+  { id: "newbie",     label: "新员工" },
+  { id: "general",    label: "通用" },
+  { id: "secretary",  label: "秘书" },
+  { id: "reception",  label: "前台接待" },
+];
+// 已选岗位工作副本（含内置 + 手输清单外岗位），保存时整体提交。
+let jobDraft = [];
 function renderJobPresets(){
-  const el = document.getElementById("jobPresetsInput");
-  if (!el) return;
-  const jobs = Array.isArray(current.jobPresets) ? current.jobPresets : [];
-  el.value = jobs.join(", ");
+  jobDraft = Array.isArray(current.jobPresets) ? current.jobPresets.slice() : [];
+  renderJobSelected(); renderJobCandidates();
+}
+function renderJobSelected(){
+  const wrap = document.getElementById("jobSelectedWrap");
+  const cnt = document.getElementById("jobPickCount");
+  if (wrap) {
+    wrap.innerHTML = jobDraft.length
+      ? jobDraft.map(j => {
+          const known = BUILTIN_JOBS.find(b => b.id === j);
+          const label = known ? known.label : j;
+          return '<span class="chip">'+esc(label)
+            + '<span class="x" title="移除" onclick="removeJobPreset(\''+escJs(j)+'\')">✕</span></span>';
+        }).join("")
+      : '<span class="chip dim">尚未选择岗位 —— 下方勾选，或手输岗位名回车追加</span>';
+  }
+  if (cnt) cnt.textContent = "已选 " + jobDraft.length + " 个岗位";
+}
+function renderJobCandidates(){
+  const wrap = document.getElementById("jobCandidatesWrap");
+  if (!wrap) return;
+  const q = (document.getElementById("jobSearchInput")?.value || "").trim().toLowerCase();
+  const sel = new Set(jobDraft);
+  const matched = BUILTIN_JOBS.filter(b =>
+    !q || b.id.toLowerCase().includes(q) || b.label.toLowerCase().includes(q)
+  );
+  if (!matched.length) {
+    wrap.innerHTML = '<div class="job-empty">无匹配岗位。清单外岗位可直接在搜索框输入岗位名并回车追加。</div>';
+    return;
+  }
+  wrap.innerHTML = '<div class="chips">' + matched.map(b => {
+    const on = sel.has(b.id);
+    return '<span class="job-cand'+(on?' on':'')+'" onclick="toggleJobPreset(\''+escJs(b.id)+'\')">'
+      + '<span class="tick">'+(on?'✓':'○')+'</span>'+esc(b.label)
+      + '<span class="ver">'+esc(b.id)+'</span></span>';
+  }).join("") + '</div>';
+}
+function toggleJobPreset(id){
+  const i = jobDraft.indexOf(id);
+  if (i >= 0) jobDraft.splice(i, 1); else jobDraft.push(id);
+  renderJobSelected(); renderJobCandidates();
+}
+function removeJobPreset(id){
+  const i = jobDraft.indexOf(id);
+  if (i >= 0) jobDraft.splice(i, 1);
+  renderJobSelected(); renderJobCandidates();
+}
+function addJobPresetManual(){
+  const inp = document.getElementById("jobSearchInput");
+  if (!inp) return;
+  const v = inp.value.trim();
+  if (!v) return;
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(v)) { toast("岗位名限字母数字-_（1-64 位）","warn"); return; }
+  if (jobDraft.indexOf(v) < 0) jobDraft.push(v);
+  inp.value = "";
+  renderJobSelected(); renderJobCandidates();
+  toast("已追加岗位 "+esc(v),"ok");
 }
 async function saveJobPresets(){
-  const raw = document.getElementById("jobPresetsInput").value;
-  const jobs = raw.split(",").map(x => x.trim()).filter(Boolean);
   try{
     const body = {
       plugins: current.plugins || [],
       managedMenu: current.managedMenu,
       clientDefaults: current.clientDefaults || {},
       envDefaults: current.envDefaults || {},
-      jobPresets: jobs,
+      jobPresets: jobDraft,
     };
     const r = await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
     const j = await r.json();
     if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
     current = j; current.jobPresets = current.jobPresets || [];
-    renderJobPresets(); toast("预装岗位已保存","ok");
+    renderJobPresets(); toast("预装岗位已保存（"+jobDraft.length+" 个）","ok");
   }catch(e){ toast("保存失败："+esc(e.message),"err"); }
 }
 

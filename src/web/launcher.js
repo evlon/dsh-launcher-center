@@ -91,4 +91,31 @@ async function uploadLauncherRelease(){
     if(btn) btn.disabled=false;
   }
 }
+// 只改最新发布物的更新说明（PATCH /api/launcher/notes，不重传 exe）
+async function updateLauncherNotes(){
+  const input=document.getElementById("launcherNotesEdit");
+  const btn=document.getElementById("launcherNotesBtn");
+  const st=document.getElementById("launcherNotesState");
+  const notes=(input&&input.value||"").trim();
+  if(btn) btn.disabled=true;
+  if(st) st.innerHTML='<span style="color:var(--amber)">保存中…</span>';
+  try{
+    const r=await fetch("/api/launcher/notes",{
+      method:"PATCH",
+      headers:headers(true),
+      body:JSON.stringify({notes})
+    });
+    const j=await r.json();
+    if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
+    toast("✅ 更新说明已保存","ok");
+    if(st) st.innerHTML='<span style="color:var(--green)">✅ 已保存</span>';
+    if(input) input.value="";
+    loadLauncherRelease();
+  }catch(e){
+    if(st) st.innerHTML='';
+    toast("❌ 保存失败："+esc(e.message),"err");
+  }finally{
+    if(btn) btn.disabled=false;
+  }
+}
 

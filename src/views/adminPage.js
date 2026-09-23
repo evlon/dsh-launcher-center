@@ -121,6 +121,18 @@ function adminPageHtml() {
   .chip .pf{background:rgba(0,0,0,.06);border-radius:10px;padding:0 6px;font-size:10.5px;opacity:.75}
   .chip .web{opacity:.55;font-size:10.5px}
 
+  /* ── 岗位勾选（jobPresets）── */
+  .job-pick{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fafbfe}
+  .job-cand{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);
+    border-radius:18px;padding:4px 12px;font-size:12.5px;font-weight:550;color:#4a5573;cursor:pointer;
+    user-select:none;transition:.12s}
+  .job-cand:hover{border-color:var(--primary);color:var(--primary)}
+  .job-cand.on{background:var(--primary-weak);color:var(--primary-ink);border-color:var(--primary)}
+  .job-cand .tick{opacity:.35;font-size:11px}
+  .job-cand.on .tick{opacity:1}
+  .job-sep{margin:12px 0 8px;font-size:11.5px;color:var(--muted);font-weight:650;letter-spacing:.3px}
+  .job-empty{color:var(--muted);font-size:12.5px;padding:4px 2px}
+
   /* ── 应装插件详情卡片 ── */
   .plugin-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-top:4px}
   .pcard{background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:14px 16px;
@@ -359,10 +371,15 @@ function adminPageHtml() {
         <div><h2 class="card-title">预装岗位（jobPresets）</h2>
         <div class="card-desc">新用户激活数字人后自动安装的岗位清单（HiMarket 岗位技能名，如 <code>pm</code> / <code>dev</code> / <code>secretary</code>）。客户端同步后，himarket 插件按名下载落盘到 <code>.agent-presets/</code>，即装即用。逗号分隔，留空=不下发。</div></div>
       </div>
-      <div class="row" style="margin-bottom:12px;max-width:620px">
-        <input class="input" id="jobPresetsInput" placeholder="岗位技能名，逗号分隔，如 pm, dev, qa, secretary" style="flex:1" onkeydown="if(event.key==='Enter')saveJobPresets()">
+      <div style="margin-bottom:10px;max-width:640px">
+        <input class="input" id="jobSearchInput" placeholder="搜索岗位（如 pm / dev / 秘书）… 回车=追加清单外岗位" style="width:100%" oninput="renderJobCandidates()" onkeydown="if(event.key==='Enter'){event.preventDefault();addJobPresetManual();}">
       </div>
-      <div style="margin-top:14px"><button class="btn primary" onclick="saveJobPresets()">保存预装岗位</button></div>
+      <div id="jobSelectedWrap" class="chips" style="margin-bottom:4px"></div>
+      <div id="jobCandidatesWrap" class="job-pick"></div>
+      <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+        <button class="btn primary" onclick="saveJobPresets()">保存预装岗位</button>
+        <span id="jobPickCount" style="font-size:12px;color:var(--muted)"></span>
+      </div>
     </div>
   </section>
 
@@ -409,6 +426,14 @@ function adminPageHtml() {
       <div class="row" style="margin-bottom:12px">
         <button class="btn primary" id="launcherUploadBtn" onclick="uploadLauncherRelease()">⬆ 上传并发布</button>
         <span class="sync-hint" id="launcherUploadState"></span>
+      </div>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line,#eee)">
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">只改「更新说明」——不改版本号/不重传 exe（已发布的 exe 与 sha256 保持不变）：</div>
+        <div class="row" style="margin-bottom:10px">
+          <input class="input" id="launcherNotesEdit" placeholder="新的更新说明（同事托盘更新提示里显示）" style="flex:1">
+          <button class="btn" id="launcherNotesBtn" onclick="updateLauncherNotes()">✎ 保存说明</button>
+        </div>
+        <span class="sync-hint" id="launcherNotesState"></span>
       </div>
       <div style="font-size:12.5px;color:var(--muted)">
         上传前先在本机构建新版本 exe（<code>cargo build --release</code> 产物即可，绿色版分发），

@@ -14,7 +14,7 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const crypto = require('node:crypto')
-const { send, readRawBody } = require('../http')
+const { send, readBody, readRawBody } = require('../http')
 const { decodeHeaderUtf8 } = require('../text')
 
 /** 版本号格式：x.y.z 或 x.y.z-预发布（如 0.3.0、0.1.2-rc.1）。 */
@@ -65,8 +65,26 @@ async function uploadRelease(ctx, req, res, url) {
   return send(res, 200, { ok: true, release: meta })
 }
 
+/** PATCH /api/launcher/notes：只改最新发布物的更新说明（管理员鉴权，不重传 exe）。 */
+async function updateNotes(ctx, req, res) {
+  if (!ctx.authorized(req)) return send(res, 403, { error: 'unauthorized' })
+  const meta = ctx.launcherReleases.readLauncherReleaseMeta()
+  if (!meta || !meta.version) return send(res, 404, { error: '无发布物可改（先上传一次版本）' })
+  let body
+  try {
+    body = await readBody(req)
+  } catch (e) {
+    return send(res, 400, { error: e.message })
+  }
+  const notes = typeof body.notes === 'string' ? body.notes.trim().slice(0, 500) : ''
+  const next = Object.assign({}, meta, { notes })
+  ctx.launcherReleases.writeLauncherReleaseMeta(next)
+  return send(res, 200, { ok: true, release: next })
+}
+
 module.exports = [
   ['GET', '/api/launcher/latest', latestRelease],
   ['GET', '/api/launcher/download', downloadRelease],
   ['POST', '/api/launcher/releases', uploadRelease],
+  ['PATCH', '/api/launcher/notes', updateNotes],
 ]

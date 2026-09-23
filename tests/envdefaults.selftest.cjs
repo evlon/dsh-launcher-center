@@ -113,6 +113,10 @@ function check(name, cond, detail) {
   r = await req('POST', '/api/config', JSON.stringify({ jobPresets: [] }), { 'X-Admin-Token': TOKEN })
   check('6e. jobPresets 空数组合法 200', r.status === 200, `status=${r.status}`)
 
+  // 7.0 PATCH /api/launcher/notes：尚无发布物 → 404（先于 7a 上传之前测）
+  r = await req('PATCH', '/api/launcher/notes', JSON.stringify({ notes: 'x' }), { 'X-Admin-Token': TOKEN })
+  check('7z. 无发布物改 notes → 404', r.status === 404, `status=${r.status}`)
+
   // 7. X-Notes 中文经 latin1 到达后应能正确还原（decodeHeaderUtf8）
   //    模拟客户端：按 UTF-8 发字节
   const notesRaw = 'v0.3.7: 修复浏览器 401 抓取令牌'
@@ -148,6 +152,20 @@ function check(name, cond, detail) {
     lat = JSON.parse(latest.body)
   } catch {}
   check('7b. notes 中文还原正确（无乱码）', lat.notes === notesRaw, `notes=${JSON.stringify(lat.notes)} 期望=${JSON.stringify(notesRaw)}`)
+
+  // 7c. PATCH /api/launcher/notes：只改 notes，版本/sha256/size 保持不变
+  const newNotes = 'v9.9.9 补充说明：新增只改 notes 端点'
+  r = await req('PATCH', '/api/launcher/notes', JSON.stringify({ notes: newNotes }), { 'X-Admin-Token': TOKEN })
+  check('7c1. 改 notes 成功 200', r.status === 200, `status=${r.status} body=${r.body.slice(0, 200)}`)
+  const lat2 = JSON.parse((await req('GET', '/api/launcher/latest')).body)
+  check('7c2. notes 已更新', lat2.notes === newNotes, `notes=${JSON.stringify(lat2.notes)}`)
+  check('7c3. version 保持不变', lat2.version === '9.9.9', `version=${lat2.version}`)
+  check('7c4. sha256 保持不变', lat2.sha256 === lat.sha256, `sha256=${lat2.sha256}`)
+  check('7c5. size 保持不变', lat2.size === lat.size, `size=${lat2.size}`)
+
+  // 7d. PATCH /api/launcher/notes 无 token → 403
+  r = await req('PATCH', '/api/launcher/notes', JSON.stringify({ notes: 'hack' }))
+  check('7d. 改 notes 无 token → 403', r.status === 403, `status=${r.status}`)
 
   console.log(`\n结果: ${pass} 通过, ${fail} 失败\n`)
   fs.rmSync(DATA, { recursive: true, force: true })
