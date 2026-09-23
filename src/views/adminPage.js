@@ -123,13 +123,17 @@ function adminPageHtml() {
 
   /* ── 岗位勾选（jobPresets）── */
   .job-pick{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fafbfe}
-  .job-cand{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);
-    border-radius:18px;padding:4px 12px;font-size:12.5px;font-weight:550;color:#4a5573;cursor:pointer;
-    user-select:none;transition:.12s}
+  .job-cand{display:flex;align-items:center;gap:8px;width:100%;background:#fff;border:1px solid var(--line);
+    border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:550;color:#4a5573;cursor:pointer;
+    user-select:none;transition:.12s;margin-bottom:6px;box-sizing:border-box}
+  .job-cand:last-child{margin-bottom:0}
   .job-cand:hover{border-color:var(--primary);color:var(--primary)}
   .job-cand.on{background:var(--primary-weak);color:var(--primary-ink);border-color:var(--primary)}
   .job-cand .tick{opacity:.35;font-size:11px}
   .job-cand.on .tick{opacity:1}
+  .job-cand .job-name{font-weight:600;white-space:nowrap}
+  .job-cand .job-desc{font-size:11.5px;color:var(--muted);font-weight:400;flex:1}
+  .job-cand .ver{font-size:10.5px;color:var(--muted);opacity:.7;font-weight:400;margin-left:auto}
   .job-sep{margin:12px 0 8px;font-size:11.5px;color:var(--muted);font-weight:650;letter-spacing:.3px}
   .job-empty{color:var(--muted);font-size:12.5px;padding:4px 2px}
 

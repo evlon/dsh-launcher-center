@@ -181,18 +181,14 @@ async function saveEnvDefaults(){
 // ── 预装岗位（jobPresets）：字符串数组，新用户激活数字人后 himarket 自动落盘 ──
 // 内置候选岗位清单（HiMarket 已发布的岗位技能名）。搜索框过滤 + chip 勾选；清单外岗位可手输追加。
 const BUILTIN_JOBS = [
-  { id: "pm",         label: "产品经理" },
-  { id: "pm-roster",  label: "产品经理·花名册" },
-  { id: "dev",        label: "研发工程师" },
-  { id: "dev-roster", label: "研发·花名册" },
-  { id: "qa",         label: "测试工程师" },
-  { id: "qa-roster",  label: "测试·花名册" },
-  { id: "leader",     label: "团队负责人" },
-  { id: "leader-roster", label: "负责人·花名册" },
-  { id: "newbie",     label: "新员工" },
-  { id: "general",    label: "通用" },
-  { id: "secretary",  label: "秘书" },
-  { id: "reception",  label: "前台接待" },
+  { id: "pm",        label: "产品经理",   desc: "产品需求、PRD、需求澄清与优先级" },
+  { id: "dev",       label: "研发工程师", desc: "接口联调、告警定位、排期评估、技术方案" },
+  { id: "qa",        label: "测试工程师", desc: "测试用例、缺陷跟踪、验收" },
+  { id: "leader",    label: "团队负责人", desc: "任务分配、进度跟进、决策驱动" },
+  { id: "newbie",    label: "新员工",     desc: "新员工上手引导与答疑" },
+  { id: "general",   label: "通用",       desc: "通用办公助手" },
+  { id: "secretary", label: "秘书",       desc: "请示分级、决策回传、上呈主人、转达话术" },
+  { id: "reception", label: "前台接待",   desc: "访客接待、咨询分流" },
 ];
 // 已选岗位工作副本（含内置 + 手输清单外岗位），保存时整体提交。
 let jobDraft = [];
@@ -221,7 +217,7 @@ function renderJobCandidates(){
   const q = (document.getElementById("jobSearchInput")?.value || "").trim().toLowerCase();
   const sel = new Set(jobDraft);
   const matched = BUILTIN_JOBS.filter(b =>
-    !q || b.id.toLowerCase().includes(q) || b.label.toLowerCase().includes(q)
+    !q || b.id.toLowerCase().includes(q) || b.label.toLowerCase().includes(q) || (b.desc||'').toLowerCase().includes(q)
   );
   if (!matched.length) {
     wrap.innerHTML = '<div class="job-empty">无匹配岗位。清单外岗位可直接在搜索框输入岗位名并回车追加。</div>';
@@ -229,8 +225,11 @@ function renderJobCandidates(){
   }
   wrap.innerHTML = '<div class="chips">' + matched.map(b => {
     const on = sel.has(b.id);
+    const desc = b.desc ? '<span class="job-desc">'+esc(b.desc)+'</span>' : '';
     return '<span class="job-cand'+(on?' on':'')+'" onclick="toggleJobPreset(\''+escJs(b.id)+'\')">'
-      + '<span class="tick">'+(on?'✓':'○')+'</span>'+esc(b.label)
+      + '<span class="tick">'+(on?'✓':'○')+'</span>'
+      + '<span class="job-name">'+esc(b.label)+'</span>'
+      + desc
       + '<span class="ver">'+esc(b.id)+'</span></span>';
   }).join("") + '</div>';
 }
