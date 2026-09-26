@@ -372,17 +372,22 @@ function adminPageHtml() {
     </div>
     <div class="card">
       <div class="card-head">
-        <div><h2 class="card-title">预装岗位（jobPresets）</h2>
-        <div class="card-desc">新用户激活数字人后自动安装的岗位清单（HiMarket 岗位技能名，如 <code>pm</code> / <code>dev</code> / <code>secretary</code>）。客户端同步后，himarket 插件按名下载落盘到 <code>.agent-presets/</code>，即装即用。逗号分隔，留空=不下发。</div></div>
+        <div><h2 class="card-title">UI 包（本地窗口 HTML 下发）</h2>
+        <div class="card-desc">launcher 三个本地窗口（激活向导 / 欢迎 / 进度）的内嵌 HTML 版本。客户端同步时发现版本落后即主动拉取 <code>/api/ui-bundle</code> 并缓存，窗口加载走「服务端下发版优先、内置兜底」双轨。<b>改 UI 不再需要重编译 exe 发版</b>。留空版本 = 关闭下发（客户端回落内置）。</div></div>
       </div>
-      <div style="margin-bottom:10px;max-width:640px">
-        <input class="input" id="jobSearchInput" placeholder="搜索岗位（如 pm / dev / 秘书）… 回车=追加清单外岗位" style="width:100%" oninput="renderJobCandidates()" onkeydown="if(event.key==='Enter'){event.preventDefault();addJobPresetManual();}">
+      <div class="row" style="margin-bottom:10px;max-width:360px">
+        <input class="input" id="uiBVer" placeholder="版本号，如 v2 或 20260927.1（变更即触发客户端更新）">
       </div>
-      <div id="jobSelectedWrap" class="chips" style="margin-bottom:4px"></div>
-      <div id="jobCandidatesWrap" class="job-pick"></div>
-      <div style="margin-top:14px;display:flex;gap:10px;align-items:center">
-        <button class="btn primary" onclick="saveJobPresets()">保存预装岗位</button>
-        <span id="jobPickCount" style="font-size:12px;color:var(--muted)"></span>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:6px">HTML 文件（与 launcher 仓库 <code>src-tauri/embedded-ui/</code> 同源；键名 = 文件名，如 <code>matrix-setup.html</code>）：</div>
+      <div id="uiFilesWrap"></div>
+      <div class="row" style="margin-bottom:10px;max-width:420px">
+        <input class="input" id="uiNewFile" placeholder="新文件名，如 matrix-setup.html">
+        <button class="btn" onclick="uiAddFile()">＋ 添加文件</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
+        <button class="btn primary" onclick="saveUiBundle()">保存 UI 包</button>
+        <button class="btn" onclick="uiBundleFromBuiltin()">从内置示例填充</button>
+        <span id="uiBState" style="font-size:12px;color:var(--muted)"></span>
       </div>
     </div>
   </section>

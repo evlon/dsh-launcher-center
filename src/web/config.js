@@ -16,6 +16,7 @@ async function loadConfig(){
     current.clientDefaults=current.clientDefaults||{};
     renderPlugins(); renderMenuPolicy(); renderClientDefaults();
     loadMirrorPackages(); loadEnvDefaults(); renderJobPresets();
+    loadUiBundle();
   }catch(e){ toast("加载配置失败："+esc(e.message),"err"); }
 }
 function renderClientDefaults(){
@@ -268,6 +269,96 @@ async function saveJobPresets(){
     if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
     current = j; current.jobPresets = current.jobPresets || [];
     renderJobPresets(); toast("预装岗位已保存（"+jobDraft.length+" 个）","ok");
+  }catch(e){ toast("保存失败："+esc(e.message),"err"); }
+}
+
+// ── UI 包（本地窗口 HTML 下发）──
+// 工作副本 uiBDraft = { version, files: { "<name>.html": "<内容>" } }
+let uiBDraft = { version: "", files: {} };
+function loadUiBundle(){
+  uiBDraft = {
+    version: (current.uiBundle && current.uiBundle.version) || "",
+    files: {},
+  };
+  // 拉全量（含 files 内容，供编辑回显）——管理页用，GET /api/ui-bundle 免鉴权
+  fetch("/api/ui-bundle").then(r=>r.json()).then(j=>{
+    if (j && j.files) uiBDraft.files = j.files;
+    renderUiBundle();
+  }).catch(()=>{ renderUiBundle(); });
+}
+function renderUiBundle(){
+  const verEl = document.getElementById("uiBVer");
+  if (verEl) verEl.value = uiBDraft.version;
+  const wrap = document.getElementById("uiFilesWrap");
+  if (!wrap) return;
+  const names = Object.keys(uiBDraft.files);
+  wrap.innerHTML = names.map(n =>
+    '<div class="row" style="margin-bottom:8px;gap:8px">' +
+      '<input class="input" value="'+esc(n)+'" style="max-width:220px;font-family:monospace" readonly>' +
+      '<textarea rows="3" style="flex:1;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;padding:6px 8px;border:1px solid var(--line2);border-radius:7px" onchange="uiBSet(\''+esc(n)+'\',this.value)">'+esc(uiBDraft.files[n]||"")+'</textarea>' +
+      '<button class="btn" onclick="uiBRemove(\''+esc(n)+'\')">✕</button>' +
+    '</div>'
+  ).join("") ||
+  '<div style="font-size:12.5px;color:var(--muted)">（暂无文件。点「从内置示例填充」导入 launcher 仓库里的三个窗口 HTML）</div>';
+}
+function uiBSet(name, content){
+  const done = [];
+  // 替换键名（旧名可能已变）：直接用原名
+  uiBDraft.files[name] = content;
+  renderUiBundle();
+}
+function uiBRemove(name){
+  delete uiBDraft.files[name];
+  renderUiBundle();
+}
+function uiAddFile(){
+  const inp = document.getElementById("uiNewFile");
+  const name = (inp && inp.value.trim()) || "";
+  if (!/^[a-zA-Z0-9._-]+\.html$/.test(name)) { toast("文件名需 <.html> 且限字母数字._-","warn"); return; }
+  if (uiBDraft.files[name] !== undefined) { toast("文件已存在："+name,"warn"); return; }
+  uiBDraft.files[name] = "";
+  uiBRemove; inp.value = "";
+  renderUiBundle();
+}
+function uiBundleFromBuiltin(){
+  // 管理员从 launcher 仓库 src-tauri/embedded-ui/ 拷贝（三窗口）
+  const sample = {
+    "matrix-setup.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head><meta charset=\"utf-8\"><title>配置数字分身</title></head>\n<body><h1>配置数字分身</h1><p>（示例占位，请替换为 launcher 仓库 src-tauri/embedded-ui/matrix-setup.html 实际内容）</p></body>\n</html>",
+    "first-run.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head><meta charset=\"utf-8\"><title>激活数字分身</title></head>\n<body><h1>🤖 激活你的数字分身</h1><p>（示例占位）</p></body>\n</html>",
+    "console.html": "<!doctype html>\n<html lang=\"zh-CN\">\n<head><meta charset=\"utf-8\"><title>操作进度</title></head>\n<body><div id=\"opPlan\"></div><p>（示例占位）</p></body>\n</html>",
+  };
+  uiBDraft.files = sample;
+  renderUiBundle();
+  toast("已填充内置示例（请替换为实际内容）","ok");
+}
+async function saveUiBundle(){
+  try{
+    const files = {};
+    for (const n of Object.keys(uiBDraft.files)) {
+      const c = uiBDraft.files[n];
+      if (!c.includes("<html")) { toast("文件 "+esc(n)+" 不是合法 HTML","warn"); return; }
+      files[n] = c;
+    }
+    const body = {
+      plugins: current.plugins || [],
+      managedMenu: current.managedMenu,
+      clientDefaults: current.clientDefaults || {},
+      envDefaults: current.envDefaults || {},
+      jobPresets: jobDraft || [],
+      uiBundle: { version: (document.getElementById("uiBVer")?.value||"").trim(), files },
+    };
+    // 版本留空 = 关闭下发（files 清空）
+    const r = await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
+    const j = await r.json();
+    if(!r.ok) throw new Error((j&&j.error)||("HTTP "+r.status));
+    current = j;
+    const stateEl = document.getElementById("uiBState");
+    if (stateEl) {
+      const v = body.uiBundle.version;
+      stateEl.textContent = v ? ("✓ 已保存 v"+esc(v)+"，客户端下次同步（5 分钟内）自动更新") : "✓ 已保存（版本为空=关闭下发）";
+      stateEl.style.color = "var(--green)";
+    }
+    toast("UI 包已保存","ok");
   }catch(e){ toast("保存失败："+esc(e.message),"err"); }
 }
 

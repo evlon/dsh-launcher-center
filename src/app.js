@@ -25,6 +25,7 @@ const syncRoutes = require('./routes/sync')
 const registryRoutes = require('./routes/registry')
 const mirrorRoutes = require('./routes/mirror')
 const launcherRoutes = require('./routes/launcher')
+const uiRoutes = require('./routes/ui')
 const pageRoutes = require('./routes/pages')
 
 /**
@@ -95,6 +96,7 @@ function createApp(args, opts = {}) {
     registryRoutes,
     mirrorRoutes,
     launcherRoutes,
+    uiRoutes,
     pageRoutes,
   ])
 

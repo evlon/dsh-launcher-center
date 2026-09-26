@@ -16,6 +16,7 @@ const { send } = require('../http')
 const { readAdminScript } = require('../adminScript')
 const { adminPageHtml } = require('../views/adminPage')
 const { downloadPageHtml } = require('../views/downloadPage')
+const { twinPageHtml } = require('../views/twinPage')
 
 /** GET /：引导到管理页（配置插件 + launcher.exe 发布等管理员功能入口）。 */
 function rootRedirect(ctx, req, res) {
@@ -27,6 +28,12 @@ function rootRedirect(ctx, req, res) {
 function adminPage(ctx, req, res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
   res.end(adminPageHtml())
+}
+
+/** GET /twin：我的数字分身状态页（仅本机探测，只读；同事浏览器打开查看自己分身状态）。 */
+function twinPage(ctx, req, res) {
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+  res.end(twinPageHtml())
 }
 
 /** GET /admin.js：管理页脚本（由 src/web/*.js 按序拼接；每次读盘，改即生效）。 */
@@ -50,5 +57,6 @@ module.exports = [
   ['GET', '/', rootRedirect],
   ['GET', '/admin', adminPage],
   ['GET', '/admin.js', adminScript],
+  ['GET', '/twin', twinPage],
   ['GET', '/download', downloadPage],
 ]

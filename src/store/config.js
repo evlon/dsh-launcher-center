@@ -25,6 +25,9 @@ const fs = require('node:fs')
  *                  管理员改一处，全员生效（客户端下次同步时应用）。
  *   jobPresets     预装岗位清单（字符串数组）：新用户激活数字人后，himarket 插件
  *                  按这些岗位名自动下载并落盘到 .agent-presets/，即装即用。
+ *   uiBundle       UI 包版本（字符串，如 "20260927.1"）：launcher 三个本地窗口
+ *                  （向导/欢迎/进度）的内嵌 HTML 从服务端下发的版本号。
+ *                  客户端同步时发现版本落后则主动拉取 UI 包，在线优先、离线回落内置。
  */
 function defaultConfig() {
   return {
@@ -36,6 +39,7 @@ function defaultConfig() {
     mirrorSettings: { registry: 'http://registry.ict.cmcc', tokenValue: '' },
     envDefaults: {},
     jobPresets: [],
+    uiBundle: { version: '', files: {} },
     updatedAt: new Date().toISOString(),
     baseUrl: '',
   }
@@ -63,6 +67,13 @@ function normalizeConfig(cfg) {
     if (typeof cfg.plugins !== 'object' || !Array.isArray(cfg.plugins)) cfg.plugins = []
     if (typeof cfg.profilePlugins !== 'object' || cfg.profilePlugins === null || Array.isArray(cfg.profilePlugins)) {
       cfg.profilePlugins = {}
+    }
+    if (typeof cfg.uiBundle !== 'object' || cfg.uiBundle === null || Array.isArray(cfg.uiBundle)) {
+      cfg.uiBundle = { version: '', files: {} }
+    }
+    if (typeof cfg.uiBundle.version !== 'string') cfg.uiBundle.version = ''
+    if (typeof cfg.uiBundle.files !== 'object' || cfg.uiBundle.files === null || Array.isArray(cfg.uiBundle.files)) {
+      cfg.uiBundle.files = {}
     }
   }
   return cfg

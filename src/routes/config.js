@@ -127,6 +127,36 @@ async function updateConfig(ctx, req, res) {
     cfg.jobPresets = jp.cleaned
   }
 
+  // UI 包版本（uiBundle）：{ version: string, files: { "<name>.html": "<内容>" } }
+  // launcher 本地窗口 HTML 的服务端下发版本。version 为空 = 不启用下发（客户端回落内置）。
+  if (body.uiBundle !== undefined) {
+    const ub = body.uiBundle
+    if (typeof ub !== 'object' || ub === null || Array.isArray(ub)) {
+      return send(res, 400, { error: 'uiBundle 必须是对象' })
+    }
+    const cleaned = { version: '', files: {} }
+    if (ub.version !== undefined) {
+      if (typeof ub.version !== 'string') return send(res, 400, { error: 'uiBundle.version 必须是字符串' })
+      if (ub.version.length > 100) return send(res, 400, { error: 'uiBundle.version 过长' })
+      cleaned.version = ub.version.trim()
+    }
+    if (ub.files !== undefined) {
+      if (typeof ub.files !== 'object' || ub.files === null || Array.isArray(ub.files)) {
+        return send(res, 400, { error: 'uiBundle.files 必须是对象' })
+      }
+      const names = Object.keys(ub.files)
+      const legal = /^[a-zA-Z0-9._-]+\.html$/
+      for (const n of names) {
+        if (!legal.test(n)) return send(res, 400, { error: 'uiBundle.files 键名非法: ' + n })
+        if (typeof ub.files[n] !== 'string') return send(res, 400, { error: 'uiBundle.files.' + n + ' 必须是字符串' })
+        if (!ub.files[n].includes('<html')) return send(res, 400, { error: 'uiBundle.files.' + n + ' 不是合法 HTML' })
+        if (ub.files[n].length > 512 * 1024) return send(res, 400, { error: 'uiBundle.files.' + n + ' 超过 512KB' })
+      }
+      cleaned.files = ub.files
+    }
+    cfg.uiBundle = cleaned
+  }
+
   // 镜像上传设置（mirrorSettings）：registry 合法 URL + tokenValue（发布凭证，存服务端）
   if (body.mirrorSettings !== undefined) {
     const ms = body.mirrorSettings
@@ -169,7 +199,15 @@ async function updateConfig(ctx, req, res) {
 /** 路由表项：[method, path, handler]。 */
 module.exports = [
   // 客户端拉取配置（免鉴权，内网）
-  ['GET', '/api/config', (ctx, req, res) => send(res, 200, ctx.config.normalizeConfig(ctx.config.readConfig()))],
+  ['GET', '/api/config', (ctx, req, res) => {
+    const cfg = ctx.config.normalizeConfig(ctx.config.readConfig())
+    // 轻量化：GET 只下发 uiBundle.version 元数据（大 HTML 内容走 /api/ui-bundle），
+    // 避免每次同步都拉 36KB+ 的 files。
+    if (cfg.uiBundle && typeof cfg.uiBundle === 'object') {
+      cfg.uiBundle = { version: cfg.uiBundle.version || '' }
+    }
+    return send(res, 200, cfg)
+  }],
   // 管理员更新配置
   ['POST', '/api/config', updateConfig],
 ]
