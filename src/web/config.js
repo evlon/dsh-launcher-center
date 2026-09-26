@@ -302,8 +302,6 @@ function renderUiBundle(){
   '<div style="font-size:12.5px;color:var(--muted)">（暂无文件。点「从内置示例填充」导入 launcher 仓库里的三个窗口 HTML）</div>';
 }
 function uiBSet(name, content){
-  const done = [];
-  // 替换键名（旧名可能已变）：直接用原名
   uiBDraft.files[name] = content;
   renderUiBundle();
 }
@@ -317,7 +315,7 @@ function uiAddFile(){
   if (!/^[a-zA-Z0-9._-]+\.html$/.test(name)) { toast("文件名需 <.html> 且限字母数字._-","warn"); return; }
   if (uiBDraft.files[name] !== undefined) { toast("文件已存在："+name,"warn"); return; }
   uiBDraft.files[name] = "";
-  uiBRemove; inp.value = "";
+  inp.value = "";
   renderUiBundle();
 }
 function uiBundleFromBuiltin(){
@@ -345,7 +343,7 @@ async function saveUiBundle(){
       clientDefaults: current.clientDefaults || {},
       envDefaults: current.envDefaults || {},
       jobPresets: jobDraft || [],
-      uiBundle: { version: (document.getElementById("uiBVer")?.value||"").trim(), files },
+      uiBundle: { version: ((document.getElementById("uiBVer")||{}).value||"").trim(), files },
     };
     // 版本留空 = 关闭下发（files 清空）
     const r = await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
