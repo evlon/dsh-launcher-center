@@ -356,6 +356,9 @@ function adminPageHtml() {
       <div class="row" style="margin-bottom:10px">
         <input class="input" id="cdDshRegistry" placeholder="dsh 安装内网源（如 http://registry.ict.cmcc；空=不下发）" style="flex:1">
       </div>
+      <div class="row" style="margin-bottom:10px">
+        <input class="input" id="cdDshVersion" placeholder="全员固定 dsh 版本（如 0.1.2-rc.1；空=不固定，回落 latest）" style="max-width:280px">
+      </div>
       <div style="margin-top:12px"><button class="btn primary" onclick="saveClientDefaults()">保存客户端默认配置</button></div>
     </div>
     <div class="card">

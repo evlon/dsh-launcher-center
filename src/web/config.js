@@ -28,6 +28,7 @@ function renderClientDefaults(){
   document.getElementById("cdProfile").value=cd.profile||"";
   document.getElementById("cdUseSystemNode").checked=!!cd.useSystemNode;
   document.getElementById("cdDshRegistry").value=cd.dshRegistry||"";
+  document.getElementById("cdDshVersion").value=cd.dshVersion||"";
   const ms=current.mirrorSettings||{};
   document.getElementById("mirrorRegistry").value=ms.registry||"http://registry.ict.cmcc";
   document.getElementById("mirrorToken").value=ms.tokenValue||"";
@@ -53,6 +54,12 @@ async function saveClientDefaults(){
     // dshRegistry：内网 dsh 安装源（下发给同事装/更新 dsh 用）；空=不下发（保留）
     const dshReg=document.getElementById("cdDshRegistry").value.trim();
     if(dshReg){ cd.dshRegistry=dshReg; }
+    // dshVersion：全员固定 dsh 版本；空=不固定（回落 latest）
+    const dshVer=document.getElementById("cdDshVersion").value.trim();
+    if(dshVer){
+      if(!/^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/.test(dshVer)){ toast("dsh 版本号格式非法（如 0.1.2-rc.1）","warn"); return; }
+      cd.dshVersion=dshVer;
+    }
     const body={plugins:current.plugins,managedMenu:current.managedMenu,clientDefaults:cd};
     const r=await fetch("/api/config",{method:"POST",headers:headers(true),body:JSON.stringify(body)});
     const j=await r.json();

@@ -109,6 +109,18 @@ async function updateConfig(ctx, req, res) {
         cleaned.dshRegistry = cd.dshRegistry.trim()
       }
     }
+    // dshVersion：全员固定 dsh 核心版本（同事 launcher 首次安装 / 检查更新时优先用它，
+    // 而非 npm dist-tags.latest——解决「不同同事装不同版本导致不能用」）。
+    // 空串=清除（不固定，回退 latest）。版本号格式同 launcher 发布物（semver 主干 + 可选预发布）。
+    if (cd.dshVersion !== undefined) {
+      if (cd.dshVersion === '' || cd.dshVersion === null) {
+        cleaned.dshVersion = ''
+      } else if (typeof cd.dshVersion !== 'string' || !/^\d+\.\d+\.\d+(-[A-Za-z0-9.]+)?$/.test(cd.dshVersion.trim())) {
+        return send(res, 400, { error: 'clientDefaults.dshVersion 必须是合法版本号（如 0.1.2-rc.1）或空串' })
+      } else {
+        cleaned.dshVersion = cd.dshVersion.trim()
+      }
+    }
     cfg.clientDefaults = cleaned
   }
 
