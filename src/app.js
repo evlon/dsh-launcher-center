@@ -27,6 +27,7 @@ const mirrorRoutes = require('./routes/mirror')
 const launcherRoutes = require('./routes/launcher')
 const uiRoutes = require('./routes/ui')
 const pageRoutes = require('./routes/pages')
+const menuRoutes = require('./routes/menu')
 
 /**
  * @param {{port:number, data:string, token:string}} args 已解析的命令行参数
@@ -98,6 +99,7 @@ function createApp(args, opts = {}) {
     launcherRoutes,
     uiRoutes,
     pageRoutes,
+    menuRoutes,
   ])
 
   /** 创建 HTTP 服务（未 listen）。 */

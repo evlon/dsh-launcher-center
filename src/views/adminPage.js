@@ -292,6 +292,7 @@ function adminPageHtml() {
   <button class="tab" data-view="plugins">插件策略</button>
   <button class="tab" data-view="npmsync">npm 包同步</button>
   <button class="tab" data-view="menu">菜单策略</button>
+  <button class="tab" data-view="releases">版本管理</button>
   <button class="tab" data-view="clients">客户端</button>
   <button class="tab" data-view="launcher">Launcher 发布</button>
 </nav>
@@ -390,7 +391,16 @@ function adminPageHtml() {
       <div style="margin-top:12px;display:flex;gap:10px;align-items:center">
         <button class="btn primary" onclick="saveUiBundle()">保存 UI 包</button>
         <button class="btn" onclick="uiBundleFromBuiltin()">从内置示例填充</button>
+        <button class="btn" onclick="previewUiBundle()">👁 预览</button>
         <span id="uiBState" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--line2)">
+        <div style="font-size:12.5px;color:var(--muted);margin-bottom:6px">回滚到历史版本（保存新版本时自动归档旧版，最多 20 条）：</div>
+        <div class="row" style="gap:8px">
+          <select class="input" id="uiRollbackSel" style="max-width:280px"><option value="">— 选择历史版本 —</option></select>
+          <button class="btn" onclick="rollbackUiBundle()">↩ 回滚</button>
+          <span id="uiRollbackState" style="font-size:12px;color:var(--muted)"></span>
+        </div>
       </div>
     </div>
   </section>
@@ -473,6 +483,18 @@ function adminPageHtml() {
         <button class="btn primary" onclick="addMenuItem()">＋ 添加</button>
       </div>
       <div style="margin-top:16px"><button class="btn primary" onclick="saveMenuPolicy()">保存菜单策略</button></div>
+    </div>
+  </section>
+
+  <!-- 版本管理（三通道版本组合下发） -->
+  <section id="view-releases" class="view">
+    <div class="card">
+      <div class="card-head">
+        <div><h2 class="card-title">三通道版本组合</h2>
+        <div class="card-desc">按「正式版 / 预览版 / 开发版」三个通道分别下发 dsh 核心 + 插件版本组合，客户端按当前通道对齐安装。发布前先在测试通道验证，再「升为正式版」灰度发布。</div></div>
+      </div>
+      <div id="releasesGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px"></div>
+      <div style="margin-top:16px"><button class="btn primary" onclick="saveReleases()">保存三通道配置</button> <span class="sync-hint" id="releasesState"></span></div>
     </div>
   </section>
 

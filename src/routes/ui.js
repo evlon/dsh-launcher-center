@@ -35,6 +35,35 @@ module.exports = [
     }
     return sendJson(res, 200, { version: ub.version, files: ub.files })
   }],
+  // 历史版本列表（供管理页回滚下拉）
+  ['GET', '/api/ui-bundle/history', (ctx, req, res) => {
+    const cfg = ctx.config.normalizeConfig(ctx.config.readConfig())
+    const history = Array.isArray(cfg.uiBundleHistory) ? cfg.uiBundleHistory : []
+    return sendJson(res, 200, {
+      current: (cfg.uiBundle && cfg.uiBundle.version) || '',
+      history: history.map((h) => ({ version: h.version, savedAt: h.savedAt })),
+    })
+  }],
+  // 回滚到历史版本
+  ['POST', '/api/ui-bundle/rollback', (ctx, req, res) => {
+    if (!ctx.authorized(req)) return sendJson(res, 403, { error: 'unauthorized' })
+    const reqUrl = req.url || ''
+    const m = reqUrl.match(/[?&]v=([^&]+)/)
+    const target = m ? decodeURIComponent(m[1]) : ''
+    if (!target) return sendJson(res, 400, { error: '缺少目标版本 ?v=' })
+    const cfg = ctx.config.normalizeConfig(ctx.config.readConfig())
+    const history = Array.isArray(cfg.uiBundleHistory) ? cfg.uiBundleHistory : []
+    const hit = history.find((h) => h.version === target)
+    if (!hit) return sendJson(res, 404, { error: '历史版本不存在: ' + target })
+    // 当前版本归档（避免回滚后又丢失可回滚点）
+    const cur = cfg.uiBundle || {}
+    if (cur.version && !history.some((h) => h.version === cur.version)) {
+      history.unshift({ version: cur.version, savedAt: new Date().toISOString(), files: cur.files || {} })
+    }
+    cfg.uiBundle = { version: hit.version, files: hit.files }
+    ctx.config.writeConfig(cfg)
+    return sendJson(res, 200, { ok: true, version: hit.version })
+  }],
 ]
 
 function sendJson(res, code, obj) {

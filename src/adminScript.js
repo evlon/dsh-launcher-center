@@ -30,6 +30,7 @@ const ORDER = [
   'plugins.js', // 插件策略与同步
   'npm.js', // npm 包同步
   'menu.js', // 菜单策略
+  'releases.js', // 三通道版本管理
   'clients.js', // 客户端展示
   'launcher.js', // launcher 发布物
   'boot.js', // 启动引导（必须最后）

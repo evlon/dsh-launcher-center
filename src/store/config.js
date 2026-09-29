@@ -40,6 +40,15 @@ function defaultConfig() {
     envDefaults: {},
     jobPresets: [],
     uiBundle: { version: '', files: {} },
+    // 托盘菜单下发（服务端 JSON，结构对齐客户端 MenuSpec）：
+    // { version: string, groups: [{ id, label, items: [{ id, label, capability?, chip?, enabledWhen? }] }] }
+    // 客户端断网时回落内置「核心 4 项」兜底菜单。
+    trayMenu: { version: '', groups: [] },
+    // 三通道版本组合（正式版/预览版/开发版各一个 Manifest）：
+    // { stable: {releaseId,dsh,plugins:[{name,version}],jobs:[]},
+    //   preview: {...}, dev: {...} }
+    // 客户端按当前通道对齐。这是「版本管理」的核心下发数据。
+    releases: { stable: {}, preview: {}, dev: {} },
     updatedAt: new Date().toISOString(),
     baseUrl: '',
   }
@@ -75,6 +84,24 @@ function normalizeConfig(cfg) {
     if (typeof cfg.uiBundle.files !== 'object' || cfg.uiBundle.files === null || Array.isArray(cfg.uiBundle.files)) {
       cfg.uiBundle.files = {}
     }
+    // 托盘菜单下发（阶段 C 新增）
+    if (typeof cfg.trayMenu !== 'object' || cfg.trayMenu === null || Array.isArray(cfg.trayMenu)) {
+      cfg.trayMenu = { version: '', groups: [] }
+    }
+    if (!Array.isArray(cfg.trayMenu.groups)) cfg.trayMenu.groups = []
+    if (typeof cfg.trayMenu.version !== 'string') cfg.trayMenu.version = ''
+    // 三通道版本组合（阶段 C 新增）
+    if (typeof cfg.releases !== 'object' || cfg.releases === null || Array.isArray(cfg.releases)) {
+      cfg.releases = { stable: {}, preview: {}, dev: {} }
+    }
+    for (const ch of ['stable', 'preview', 'dev']) {
+      if (typeof cfg.releases[ch] !== 'object' || cfg.releases[ch] === null || Array.isArray(cfg.releases[ch])) {
+        cfg.releases[ch] = {}
+      }
+    }
+    // UI 包历史版本（阶段 D 新增，供回滚）：
+    // [{ version, savedAt, files }]，最新在前，最多保留 20 条。
+    if (!Array.isArray(cfg.uiBundleHistory)) cfg.uiBundleHistory = []
   }
   return cfg
 }

@@ -166,6 +166,21 @@ async function updateConfig(ctx, req, res) {
       }
       cleaned.files = ub.files
     }
+    // 归档旧版本（供回滚）：版本号变了且新旧都非空时，把旧包压入历史
+    const old = cfg.uiBundle || {}
+    if (cleaned.version && cleaned.version !== (old.version || '') && old.version) {
+      if (!Array.isArray(cfg.uiBundleHistory)) cfg.uiBundleHistory = []
+      // 去重（同版本不重复归档）
+      if (!cfg.uiBundleHistory.some((h) => h.version === old.version)) {
+        cfg.uiBundleHistory.unshift({
+          version: old.version,
+          savedAt: new Date().toISOString(),
+          files: old.files || {},
+        })
+        // 最多保留 20 条历史
+        if (cfg.uiBundleHistory.length > 20) cfg.uiBundleHistory.length = 20
+      }
+    }
     cfg.uiBundle = cleaned
   }
 

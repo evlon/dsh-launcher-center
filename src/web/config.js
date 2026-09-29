@@ -17,6 +17,7 @@ async function loadConfig(){
     renderPlugins(); renderMenuPolicy(); renderClientDefaults();
     loadMirrorPackages(); loadEnvDefaults(); renderJobPresets();
     loadUiBundle();
+    loadReleases();
   }catch(e){ toast("加载配置失败："+esc(e.message),"err"); }
 }
 function renderClientDefaults(){
@@ -292,6 +293,50 @@ function loadUiBundle(){
     if (j && j.files) uiBDraft.files = j.files;
     renderUiBundle();
   }).catch(()=>{ renderUiBundle(); });
+  loadUiBundleHistory();
+}
+// 历史版本下拉（供回滚）
+function loadUiBundleHistory(){
+  fetch("/api/ui-bundle/history").then(r=>r.json()).then(j=>{
+    const sel = document.getElementById("uiRollbackSel");
+    if(!sel) return;
+    const opts = (j.history || []).map(function(h){
+      const cur = h.version === j.current ? "（当前）" : "";
+      return '<option value="'+esc(h.version)+'">'+esc(h.version)+esc(cur)+" · "+esc(fmtTime(h.savedAt))+'</option>';
+    }).join("");
+    sel.innerHTML = '<option value="">— 选择历史版本 —</option>' + opts;
+  }).catch(()=>{});
+}
+// 预览当前草稿（新窗口渲染首个 HTML 文件）
+function previewUiBundle(){
+  const names = Object.keys(uiBDraft.files || {});
+  if(!names.length){ toast("暂无文件可预览","warn"); return; }
+  const name = names[0];
+  const content = uiBDraft.files[name];
+  const w = window.open("", "_blank");
+  if(!w){ toast("请允许弹出窗口","warn"); return; }
+  w.document.open();
+  w.document.write(content);
+  w.document.close();
+  toast("预览中（"+esc(name)+"）","ok");
+}
+// 回滚到历史版本
+async function rollbackUiBundle(){
+  const sel = document.getElementById("uiRollbackSel");
+  const v = sel && sel.value;
+  if(!v){ toast("请选择历史版本","warn"); return; }
+  const st = document.getElementById("uiRollbackState");
+  try{
+    const r = await fetch("/api/ui-bundle/rollback?v="+encodeURIComponent(v),{ method:"POST", headers:headers(true) });
+    const j = await r.json();
+    if(!r.ok) throw new Error((j && j.error) || ("HTTP " + r.status));
+    if(st){ st.innerHTML = '<span style="color:var(--green)">✅ 已回滚到 '+esc(v)+'，客户端下次同步生效</span>'; }
+    toast("✅ UI 包已回滚到 "+esc(v),"ok");
+    loadUiBundle();
+  }catch(e){
+    if(st) st.innerHTML = "";
+    toast("❌ 回滚失败："+esc(e.message),"err");
+  }
 }
 function renderUiBundle(){
   const verEl = document.getElementById("uiBVer");
