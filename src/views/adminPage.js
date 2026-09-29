@@ -409,6 +409,7 @@ function adminPageHtml() {
       <div class="row" style="margin-bottom:14px;flex-wrap:wrap;gap:8px">
         <button class="btn" onclick="checkNpmSyncStatus()">⟳ 刷新同步状态</button>
         <button class="btn primary" id="npmsyncAllBtn" onclick="syncAllNpmPkgs()">🚀 同步全部未同步</button>
+        <button class="btn danger" id="npmsyncCancelBtn" style="display:none" onclick="cancelNpmSync()">✕ 取消同步</button>
         <span class="sync-hint" id="npmsyncState"></span>
         <span style="color:var(--faint);font-size:12px">同步目标：顶部全局栏「内网 registry」；执行需顶部全局栏「本机管理能力」已连接</span>
       </div>

@@ -186,10 +186,12 @@ async function syncOneNpmPkg(i,onlyStr){
       fetch("http://127.0.0.1:"+bridgePort+"/api/registry/mirror/progress?token="+encodeURIComponent(bridgeTok),{headers:headers(false)})
         .then(r=>r.json()).then(j=>{
           const p=(j&&j.progress)||{};
-          if(p.state==="done"||p.state==="error"){
+          if(p.state==="done"||p.state==="error"||p.state==="cancelled"){
             clearInterval(t);
             setBtn("同步此包",false);
-            toast(p.state==="done" ? ("✅ "+esc(onlyStr||item.name)+" 已同步") : ("❌ 同步失败："+esc((p.error||"").slice(0,150))), p.state==="done"?"ok":"err");
+            if(p.state==="done") toast("✅ "+esc(onlyStr||item.name)+" 已同步","ok");
+            else if(p.state==="cancelled") toast("⏹ "+esc(onlyStr||item.name)+" 同步已取消","ok");
+            else toast("❌ 同步失败："+esc((p.error||"").slice(0,150)),"err");
             renderNpmSync();
           }
         }).catch(()=>{});
@@ -223,12 +225,39 @@ async function syncAllNpmPkgs(){
       const j=await r.json();
       if(!j.ok){ toast("❌ "+esc(item.name)+" 启动失败："+esc(j.error||""),"err"); continue; }
       toast("🚀 已发起 "+esc(only)+"（含依赖）…","ok");
-      // 等待该任务完成（轮询）
-      await waitNpmMirrorDone(item.name);
+      // 等待该任务完成（轮询）；取消则中断整个队列，不再发起后续包
+      const endState = await waitNpmMirrorDone(item.name);
+      if(endState==="cancelled") break;
     }catch(e){ toast("❌ 同步 "+esc(item.name)+" 失败："+esc(e.message),"err"); }
   }
   if(st) st.innerHTML='';
   renderNpmSync();
+}
+// 取消进行中的 npm 包同步 → bridge mirror/cancel（同一 bridge 端口）
+async function cancelNpmSync(){
+  if(!bridgePort){ toast("❌ 未连接管理员本机管理能力","err"); return; }
+  const bridgeTok=localStorage.getItem("bridgeToken")||"";
+  const cancelBtn=document.getElementById("npmsyncCancelBtn");
+  if(cancelBtn){ cancelBtn.disabled=true; cancelBtn.textContent="取消中…"; }
+  try{
+    const ctrl=new AbortController();
+    setTimeout(()=>ctrl.abort(),8000);
+    const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/mirror/cancel?token="+encodeURIComponent(bridgeTok),{
+      method:"POST",headers:headers(false),signal:ctrl.signal
+    });
+    const j=await r.json().catch(()=>null);
+    if(r.ok&&j&&j.ok){
+      toast("⏹ 已请求取消同步，正在停止…","ok");
+      // 立刻再轮询一次，尽快拿到 cancelled 状态（后端在下一检查点改写）
+      pollNpmMirrorProgress(true);
+    } else {
+      if(cancelBtn){ cancelBtn.disabled=false; cancelBtn.textContent="✕ 取消同步"; }
+      toast("❌ 取消失败："+esc((j&&j.error)||("HTTP "+r.status)),"err");
+    }
+  }catch(e){
+    if(cancelBtn){ cancelBtn.disabled=false; cancelBtn.textContent="✕ 取消同步"; }
+    toast("❌ 无法连接管理能力："+esc(e.message),"err");
+  }
 }
 // 查询单个 npm 包内网是否已同步（bridge 优先、服务端降级）
 async function npmPkgIsSynced(item){
@@ -239,7 +268,7 @@ async function npmPkgIsSynced(item){
     return !!(s&&s.state==="synced");
   }catch(e){ return false; }
 }
-// 等待 bridge 镜像任务结束（供 syncAllNpmPkgs 串行）
+// 等待 bridge 镜像任务结束（供 syncAllNpmPkgs 串行）；resolve 返回结束原因 state（done/error/cancelled/abort）
 function waitNpmMirrorDone(name){
   return new Promise((resolve)=>{
     const bridgeTok=localStorage.getItem("bridgeToken")||"";
@@ -248,12 +277,13 @@ function waitNpmMirrorDone(name){
         const r=await fetch("http://127.0.0.1:"+bridgePort+"/api/registry/mirror/progress?token="+encodeURIComponent(bridgeTok),{headers:headers(false)});
         const j=await r.json();
         const p=(j&&j.progress)||{};
-        if(p.state==="done"||p.state==="error"){
+        if(p.state==="done"||p.state==="error"||p.state==="cancelled"){
           clearInterval(t);
           if(p.state==="error") toast("❌ 同步 "+esc(name)+" 失败："+esc((p.error||"").slice(0,150)),"err");
-          resolve();
+          else if(p.state==="cancelled") toast("⏹ 同步 "+esc(name)+" 已取消","ok");
+          resolve(p.state);
         }
-      }catch(e){ clearInterval(t); resolve(); }
+      }catch(e){ clearInterval(t); resolve("abort"); }
     },2000);
   });
 }
@@ -272,11 +302,13 @@ async function pollNpmMirrorProgress(refreshAfterDone){
     npmPollFailures=0;
     const p=j.progress||{};
     const allBtn=document.getElementById("npmsyncAllBtn");
+    const cancelBtn=document.getElementById("npmsyncCancelBtn");
     if(p.state==="running"){
       if(el) el.innerHTML='<div style="background:#eef4ff;border:1px solid #cfe0ff;border-radius:8px;padding:10px 14px">'+
         '⏳ 同步中：<b>'+esc(p.current_pkg||"…")+'</b><br>进度：'+p.done_pkgs+'/'+p.total_pkgs+' 个包</div>';
       if(st) st.innerHTML='<span style="color:var(--amber)">同步中…</span>';
       if(allBtn) allBtn.disabled=true;
+      if(cancelBtn) cancelBtn.style.display="";
       if(npmPollTimer) clearTimeout(npmPollTimer);
       npmPollTimer=setTimeout(()=>pollNpmMirrorProgress(refreshAfterDone),3000);
     } else if(p.state==="done"){
@@ -285,6 +317,16 @@ async function pollNpmMirrorProgress(refreshAfterDone){
         '✅ 同步完成：'+p.done_pkgs+'/'+p.total_pkgs+' 个包已同步到 '+esc(p.registry||"")+'</div>';
       if(st) st.innerHTML='<span style="color:var(--green)">已完成</span>';
       if(allBtn) allBtn.disabled=false;
+      if(cancelBtn) cancelBtn.style.display="none";
+      if(refreshAfterDone) renderNpmSync();
+    } else if(p.state==="cancelled"){
+      if(npmPollTimer){ clearTimeout(npmPollTimer); npmPollTimer=null; }
+      if(el) el.innerHTML='<div style="background:#f5f5f7;border:1px solid #d9d9de;border-radius:8px;padding:10px 14px">'+
+        '⏹ 同步已取消：已同步 '+p.done_pkgs+'/'+p.total_pkgs+' 个包'+
+        (p.current_pkg?'（停止于 <b>'+esc(p.current_pkg)+'</b>）':'')+'</div>';
+      if(st) st.innerHTML='<span style="color:var(--muted)">已取消</span>';
+      if(allBtn) allBtn.disabled=false;
+      if(cancelBtn) cancelBtn.style.display="none";
       if(refreshAfterDone) renderNpmSync();
     } else if(p.state==="error"){
       if(npmPollTimer){ clearTimeout(npmPollTimer); npmPollTimer=null; }
@@ -292,6 +334,7 @@ async function pollNpmMirrorProgress(refreshAfterDone){
         '❌ 同步出错：'+esc((p.error||"").slice(0,300))+'</div>';
       if(st) st.innerHTML='<span style="color:var(--red)">出错</span>';
       if(allBtn) allBtn.disabled=false;
+      if(cancelBtn) cancelBtn.style.display="none";
       if(refreshAfterDone) renderNpmSync();
     }
   }catch(e){
